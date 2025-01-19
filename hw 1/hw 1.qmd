@@ -134,43 +134,60 @@ do
 done
 ```
 
-In summary, there are 546029 lines in the file 'admissions.csv.gz", there are 158374765 lines in the file 'labevents.csv.gz', and there are 364628 lines in the 'patients.csv.gz' data file. In the following code, we iterate through all the .gz files in the ~/mimic/hosp directory that matches the "a, l, pa" prefixes. The "gzcat" command decomrpepsses each file and outputs its content to standard output. Afterwards, the "wc -l" command prints the number of lines in each iterated file. 
+In summary, there are 546029 lines in the file 'admissions.csv.gz", there are 158374765 lines in the file 'labevents.csv.gz', and there are 364628 lines in the 'patients.csv.gz' data file. In the following code, we iterate through all the .gz files in the ~/mimic/hosp directory that matches the "a, l, pa" prefixes. The "gzcat" command decompresses each file and outputs its content to standard output. Afterwards, the "wc -l" command prints the number of lines in each iterated file. 
 
 5.  Display the first few lines of `admissions.csv.gz`. How many rows are in this data file, excluding the header line? Each `hadm_id` identifies a hospitalization. How many hospitalizations are in this data file? How many unique patients (identified by `subject_id`) are in this data file? Do they match the number of patients listed in the `patients.csv.gz` file? (Hint: combine Linux commands `zcat <`, `head`/`tail`, `awk`, `sort`, `uniq`, `wc`, and so on.)
 
 **(3.5) Solution: ** 
 The first few lines of admissions.csv.gz are:
+
 ```{bash}
-zcat < ~/mimic/hosp/admissions.csv.gz | head 
+zcat < ~/mimic/hosp/admissions.csv.gz | 
+head 
 ```
 
-The number of rows in this data file, excluding the header line are: 
+The number of rows in this data file, excluding the header line is: 
 ```{bash}
-zcat < ~/mimic/hosp/admissions.csv.gz | tail -n +2 | wc -l
+zcat < ~/mimic/hosp/admissions.csv.gz |
+tail -n +2 |
+wc -l
 ```
 
-If each hadm_id identifies a hospitalization, the number of hospitalizations in this data file is:
-```{bash}
-zcat < ~/mimic/hosp/admissions.csv.gz | tail -n +2 | cut -d, -f2 |
-sort | uniq |wc -l
+If each hadm_id identifies a hospitalization, the number of hospitalizations in this data file is the same as the number of rows in the file (546028). Therefore, we are able to conclude that each hospital admission is unique and independent as none of the entries repeat. 
 
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz | 
+tail -n +2 | 
+awk -F, '{print $2}' |
+sort |
+uniq | 
+wc -l 
 ```
 
+The number of unique patients there are in this data file (admissions) is 223452 patients (identified by subject_id). 
 
-The number of unique patients there are in this data file is: 
 ```{bash}
-zcat < ~/mimic/hosp/admissions.csv.gz | tail -n +2 | awk -F, '{print $3}' |sort |uniq | wc -l 
+zcat < ~/mimic/hosp/admissions.csv.gz | 
+tail -n +2 | 
+awk -F, '{print $1}' |
+sort |uniq | wc -l
 ```
 
+Now, let's first peek the first few lines of the patient.csv.gz file: 
 
-The number of patients listed in this patients.csv.gz file 
 ```{bash}
-zcat < ~/mimic/hosp/patients.csv.gz |tail -n +2 | awk -F, '{print $1}' | sort | uniq |wc -l
+zcat < ~/mimic/hosp/patients.csv.gz | head 
 ```
+The number of patients listed in this patients.csv.gz file is 364627 patients. Recall that the number of unique patients that are in the admission.csv.gz file(identified by subject_id) is 223452 patients. These 2 numbers do not match as the number of patients listed in the patients.csv.gv file is greater than the number of unique patients in the admissions.csv.gz file. 
 
-Remark: The number of unique patients there are in the data file (identified by subject_id) does not match the number of patients listed in the patients.csv.gz file because 
-
-
+```{bash}
+zcat < ~/mimic/hosp/patients.csv.gz |
+tail -n +2 | 
+awk -F, '{print $1}' | 
+sort | 
+uniq |
+wc -l
+```
 
 6.  What are the possible values taken by each of the variable `admission_type`, `admission_location`, `insurance`, and `ethnicity`? Also report the count for each unique value of these variables in decreasing order. (Hint: combine Linux commands `zcat`, `head`/`tail`, `awk`, `uniq -c`, `wc`, `sort`, and so on; skip the header line.)
 
@@ -178,7 +195,6 @@ Remark: The number of unique patients there are in the data file (identified by 
 
 ```{bash}
 zcat < ~/mimic/hosp/admissions.csv.gz | head 
-
 ```
 
 7. The `icusays.csv.gz` file contains all the ICU stays during the study period. How many ICU stays, identified by `stay_id`, are in this data file? How many unique patients, identified by `subject_id`, are in this data file?

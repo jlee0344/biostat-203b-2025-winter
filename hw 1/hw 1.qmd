@@ -98,17 +98,14 @@ Here is the content of 'icu' folder:
 ls -l ~/mimic/icu/
 ```
 
-These data were distributed as ".csv.gz" files instead of .csv files because the ".gz" extension insinuates that the CSV data has been compressed due to its large size.
-When compressing the CSV file, the underlying data format is still CSV but users are more easily able to open and the read the data in any CSV reader even after decompression.
-The data that we downloaded (Mimic) is an extremely large file and beig able to compress it using the Gzip algorithm reduces the file size and makes it more efficient to store.
+These data were distributed as ".csv.gz" files instead of .csv files because the ".gz" extension insinuates that the CSV data has been compressed due to its large size. When compressing the CSV file, the underlying data format is still CSV but users are more easily able to open and the read the data in any CSV reader even after decompression. The data that we downloaded (Mimic) is an extremely large file and beig able to compress it using the Gzip algorithm reduces the file size and makes it more efficient to store.
 
 3.  Briefly describe what Bash commands `zcat`, `zless`, `zmore`, and `zgrep` do.
 
 **(3.3) Solution:** The Bash command `zcat` is equivalent to the cat for gzip-compressed files.
 It is used to output the contents of the .gz file without creating an uncompressed version of the file.
 
-The Bash command `zless`is similar to the less command.
-It allows users to view the contents of the compressed files without having to decompress or extract them.
+The Bash command `zless`is similar to the less command. It allows users to view the contents of the compressed files without having to decompress or extract them.
 
 The Bash command `zmore`is used to display compressed or plan text files one screen at a time without first decompressing them.
 
@@ -128,44 +125,52 @@ done
 Display the number of lines in each data file using a similar loop.
 (Hint: combine linux commands `zcat <` and `wc -l`.)
 
-```{bash}
+**Solution:** The number of lines in each data file for admission.csv.gv, labevents.csv.gz, and patients.csv.gz are as follows: 
 
+```{bash}
+for datafile in ~/mimic/hosp/{a,l,pa}*.gz
+do
+  gzcat "$datafile" | wc -l
+done
 ```
+
+In summary, there are 546029 lines in the file 'admissions.csv.gz", there are 158374765 lines in the file 'labevents.csv.gz', and there are 364628 lines in the 'patients.csv.gz' data file. In the following code, we iterate through all the .gz files in the ~/mimic/hosp directory that matches the "a, l, pa" prefixes. The "gzcat" command decomrpepsses each file and outputs its content to standard output. Afterwards, the "wc -l" command prints the number of lines in each iterated file. 
 
 5.  Display the first few lines of `admissions.csv.gz`. How many rows are in this data file, excluding the header line? Each `hadm_id` identifies a hospitalization. How many hospitalizations are in this data file? How many unique patients (identified by `subject_id`) are in this data file? Do they match the number of patients listed in the `patients.csv.gz` file? (Hint: combine Linux commands `zcat <`, `head`/`tail`, `awk`, `sort`, `uniq`, `wc`, and so on.)
 
-**(3.5): Solution**
-
+**(3.5) Solution: ** 
+The first few lines of admissions.csv.gz are:
 ```{bash}
 zcat < ~/mimic/hosp/admissions.csv.gz | head 
+```
 
-The number of rows in this data file, excluding the header line is: 
-
+The number of rows in this data file, excluding the header line are: 
+```{bash}
 zcat < ~/mimic/hosp/admissions.csv.gz | tail -n +2 | wc -l
 ```
 
-The number of hospitalizations in this data file is:
-
+If each hadm_id identifies a hospitalization, the number of hospitalizations in this data file is:
 ```{bash}
 zcat < ~/mimic/hosp/admissions.csv.gz | tail -n +2 | cut -d, -f2 |
 sort | uniq |wc -l
 
 ```
 
-The same as the numer of rows in the file.
-Peek the first few lines of
 
-The number of unique patients in this data file is
-
+The number of unique patients there are in this data file is: 
 ```{bash}
 zcat < ~/mimic/hosp/admissions.csv.gz | tail -n +2 | awk -F, '{print $3}' |sort |uniq | wc -l 
 ```
 
-which is less than the number of patients listed in the 'patinets.csv.gz' file
 
+The number of patients listed in this patients.csv.gz file 
 ```{bash}
 zcat < ~/mimic/hosp/patients.csv.gz |tail -n +2 | awk -F, '{print $1}' | sort | uniq |wc -l
 ```
+
+Remark: The number of unique patients there are in the data file (identified by subject_id) does not match the number of patients listed in the patients.csv.gz file because 
+
+
 
 6.  What are the possible values taken by each of the variable `admission_type`, `admission_location`, `insurance`, and `ethnicity`? Also report the count for each unique value of these variables in decreasing order. (Hint: combine Linux commands `zcat`, `head`/`tail`, `awk`, `uniq -c`, `wc`, `sort`, and so on; skip the header line.)
 
@@ -174,24 +179,18 @@ zcat < ~/mimic/hosp/patients.csv.gz |tail -n +2 | awk -F, '{print $1}' | sort | 
 ```{bash}
 zcat < ~/mimic/hosp/admissions.csv.gz | head 
 
+```
 
 7. The `icusays.csv.gz` file contains all the ICU stays during the study period. How many ICU stays, identified by `stay_id`, are in this data file? How many unique patients, identified by `subject_id`, are in this data file?
 
-**Solution: ** 
+**(5.7) Solution** 
 There are ICU stays in this data file 
 
 
-```
-
-There are unique patients in this data file
-
-```{bash}
-
-```
 
 8.  *To compress, or not to compress. That's the question.* Let's focus on the big data file `labevents.csv.gz`. Compare compressed gz file size to the uncompressed file size. Compare the run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` versus `wc -l labevents.csv`. Discuss the trade off between storage and speed for big data files. (Hint: `gzip -dk < FILENAME.gz > ./FILENAME`. Remember to delete the large `labevents.csv` file after the exercise.)
 
-**Solution:**
+**(5.8) Solution:**
 
 ```{bash}
 
@@ -352,7 +351,7 @@ The time sleep 5 command showcases how long the operation takes to execute after
 time sleep 5 
 ```
 
-The history | tail command showcases the last 10 commands that were executed.
+The history \| tail command showcases the last 10 commands that were executed.
 
 ```{bash}
 history | tail

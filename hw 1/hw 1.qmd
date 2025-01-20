@@ -139,8 +139,8 @@ In summary, there are 546029 lines in the file 'admissions.csv.gz", there are 15
 5.  Display the first few lines of `admissions.csv.gz`. How many rows are in this data file, excluding the header line? Each `hadm_id` identifies a hospitalization. How many hospitalizations are in this data file? How many unique patients (identified by `subject_id`) are in this data file? Do they match the number of patients listed in the `patients.csv.gz` file? (Hint: combine Linux commands `zcat <`, `head`/`tail`, `awk`, `sort`, `uniq`, `wc`, and so on.)
 
 **(3.5) Solution: ** 
-The first few lines of admissions.csv.gz are:
 
+The first few lines of admissions.csv.gz are:
 ```{bash}
 zcat < ~/mimic/hosp/admissions.csv.gz | 
 head 
@@ -170,7 +170,9 @@ The number of unique patients there are in this data file (admissions) is 223452
 zcat < ~/mimic/hosp/admissions.csv.gz | 
 tail -n +2 | 
 awk -F, '{print $1}' |
-sort |uniq | wc -l
+sort |
+uniq | 
+wc -l
 ```
 
 Now, let's first peek the first few lines of the patient.csv.gz file: 
@@ -191,30 +193,106 @@ wc -l
 
 6.  What are the possible values taken by each of the variable `admission_type`, `admission_location`, `insurance`, and `ethnicity`? Also report the count for each unique value of these variables in decreasing order. (Hint: combine Linux commands `zcat`, `head`/`tail`, `awk`, `uniq -c`, `wc`, `sort`, and so on; skip the header line.)
 
-**(5.6) Solution** The possible values taken by each of the variable.
+**(3.6) Solution** 
+
+Start with listing out all the variable names (header row): 
 
 ```{bash}
-zcat < ~/mimic/hosp/admissions.csv.gz | head 
+zcat < ~/mimic/hosp/admissions.csv.gz  | head -1
+```
+
+The possible unique values and their corresponding counts taken by the variable 'admission_type' are: 
+
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz | 
+tail -n +2 | 
+awk -F, '{print $6}' | 
+sort | 
+uniq -c | 
+sort -nr
+```
+
+The possible unique values and their corresponding counts taken by the variable 'admission_location' are: 
+
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz | 
+tail -n +2 | 
+awk -F, '{print $8}' | 
+sort | 
+uniq -c | 
+sort -nr
+```
+
+The possible unique values and their corresponding counts taken by the variable 'insurance' are: 
+
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz | 
+tail -n +2 | 
+awk -F, '{print $10}' | 
+sort | 
+uniq -c | 
+sort -nr
+```
+
+The possible values taken by the varaible 'ethnicity' are: 
+
+```{bash}
+zcat < ~/mimic/hosp/admissions.csv.gz | 
+tail -n +2 | 
+awk -F, '{print $13}' | 
+sort | 
+uniq -c | 
+sort -nr
 ```
 
 7. The `icusays.csv.gz` file contains all the ICU stays during the study period. How many ICU stays, identified by `stay_id`, are in this data file? How many unique patients, identified by `subject_id`, are in this data file?
 
-**(5.7) Solution** 
-There are ICU stays in this data file 
+**(3.7) Solution** 
+Let's first take a peek of the first few rows of the 'icusays.csv.gv' 
 
+```{bash}
+zcat < ~/mimic/icu/icustays.csv.gz | head 
+```
+
+The number of ICU stays (as identified by 'stay_id') is in the data file is 94458 ICU stays. 
+
+```{bash}
+zcat < ~/mimic/icu/icustays.csv.gz | 
+tail -n +2 | 
+awk -F, '{print $3}' | 
+sort | 
+uniq | 
+wc -l 
+```
+
+
+The number of unique patients (identified by 'subject_id') in the data file is 65366 patients. 
+
+```{bash}
+zcat < ~/mimic/icu/icustays.csv.gz | 
+tail -n +2 | 
+awk -F, '{print $1}' | 
+sort | 
+uniq | 
+wc -l 
+```
 
 
 8.  *To compress, or not to compress. That's the question.* Let's focus on the big data file `labevents.csv.gz`. Compare compressed gz file size to the uncompressed file size. Compare the run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` versus `wc -l labevents.csv`. Discuss the trade off between storage and speed for big data files. (Hint: `gzip -dk < FILENAME.gz > ./FILENAME`. Remember to delete the large `labevents.csv` file after the exercise.)
 
 **(5.8) Solution:**
 
-```{bash}
+The run times of `zcat < ~/mimic/labevents.csv.gz | wc -l`. The run time of `wc -l labevents.csv`.
+The trade off between storage and speed for big data file is that 
 
+```{bash}
+zcat < ~/mimic/labevents.csv.gz | wc -l
+wc -l labevents.csv
 ```
 
 ## Q4. Who's popular in Price and Prejudice
 
-1.  You and your friend just have finished reading *Pride and Prejudice* by Jane Austen. Among the four main characters in the book, Elizabeth, Jane, Lydia, and Darcy, your friend thinks that Darcy was the most mentioned. You, however, are certain it was Elizabeth. Obtain the full text of the novel from <http://www.gutenberg.org/cache/epub/42671/pg42671.txt> and save to your local folder.
+1.  You and your friend just have finished reading *Pride and Prejudice* by Jane Austen. Among the four main characters in the book, Elizabeth, Jane, Lydia, and Darcy, your friend thinks that Darcy was the most mentioned. You, however, are certain it was Elizabeth. Obtain the full text of the novel from <http://www.gutenberg.org/cache/epub/42671/pg42671.txt> and save to your local folder. **Done ** 
 
 ```{bash}
 #| eval: false
@@ -222,16 +300,19 @@ wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
 ```
 
 Explain what `wget -nc` does.
+
+**(4.1) Solution: ** The 'wget -nc' command is used to download a file from the internet. The '-nc' flag is used to prevent 
 Do **not** put this text file `pg42671.txt` in Git.
 Complete the following loop to tabulate the number of times each of the four characters is mentioned using Linux commands.
 
 ```{bash}
 #| eval: false
-wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
+#wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
+
 for char in Elizabeth Jane Lydia Darcy
 do
   echo $char:
-  # some bash commands here
+  grep -o -i $char pg42671.txt | wc -l
 done
 ```
 
@@ -248,6 +329,10 @@ and
 #| eval: false
 echo 'hello, world' >> test2.txt
 ```
+
+**(4.2) Solution: ** The first command 
+The second command 
+
 
 3.  Using your favorite text editor (e.g., `vi`), type the following and save the file as `middle.sh`:
 

@@ -280,14 +280,34 @@ wc -l
 
 8.  *To compress, or not to compress. That's the question.* Let's focus on the big data file `labevents.csv.gz`. Compare compressed gz file size to the uncompressed file size. Compare the run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` versus `wc -l labevents.csv`. Discuss the trade off between storage and speed for big data files. (Hint: `gzip -dk < FILENAME.gz > ./FILENAME`. Remember to delete the large `labevents.csv` file after the exercise.)
 
-**(5.8) Solution:**
-
-The run times of `zcat < ~/mimic/labevents.csv.gz | wc -l`. The run time of `wc -l labevents.csv`.
-The trade off between storage and speed for big data file is that 
+**(3.8) Solution:**
+The compressed gz file (`labevents.csv.gz`) has a size of 2.4G. 
+The uncompressed file ('labevents.csv') has a size of 17G. 
 
 ```{bash}
-zcat < ~/mimic/labevents.csv.gz | wc -l
-wc -l labevents.csv
+ls -lh ~/mimic/hosp/labevents.csv.gz 
+```
+
+```{bash}
+gzip -dk < ~/mimic/hosp/labevents.csv.gz > ~/mimic/hosp/labevents.csv
+ls -lh ~/mimic/hosp/labevents.csv
+```
+
+The run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` are displayed below: 
+```{bash}
+time zcat < ~/mimic/hosp/labevents.csv.gz | wc -l
+```
+The run time of `wc -l labevents.csv` are displayed below: 
+
+```{bash}
+time wc -l ~/mimic/hosp/labevents.csv
+```
+From the outputs above, we observe that the compressed .gz file is significantly smaller in size compared to the uncompressed file. However, running the same command to count the number of lines takes longer on the compressed file than on the uncompressed file. This highlights the trade-offs between storage and speed: while compressed files are more efficient in saving disk space, they require decompression, which increases processing time and computational resource usage. For large datasets, operations like wc -l are slower on compressed files compared to uncompressed ones, due to the added overhead of decompression (computational effort and use of more system resources such as CPU and memory). 
+
+We erase the 'labevents.csv' file before proceeding on the next exercise.
+
+```{bash}
+rm ~/mimic/hosp/labevents.csv
 ```
 
 ## Q4. Who's popular in Price and Prejudice
@@ -301,19 +321,23 @@ wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
 
 Explain what `wget -nc` does.
 
-**(4.1) Solution: ** The 'wget -nc' command is used to download a file from the internet. The '-nc' flag is used to prevent 
+**(4.1) Solution: ** The 'wget -nc' command is used to download a file from the internet. The '-nc' flag is used to prevent the download of the file if it already exists in the current directory. If the file already exists, the download will not be executed. 
+
 Do **not** put this text file `pg42671.txt` in Git.
+
 Complete the following loop to tabulate the number of times each of the four characters is mentioned using Linux commands.
+There is an additional way to count the number of words (one line may contain the same name multiple times): 
+
 
 ```{bash}
-#| eval: false
 #wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
 
 for char in Elizabeth Jane Lydia Darcy
 do
-  echo $char:
-  grep -o -i $char pg42671.txt | wc -l
+  echo "$char: "
+  grep -o -i "$char" pg42671.txt | wc -l
 done
+
 ```
 
 2.  What's the difference between the following two commands?
@@ -330,9 +354,7 @@ and
 echo 'hello, world' >> test2.txt
 ```
 
-**(4.2) Solution: ** The first command 
-The second command 
-
+**(4.2) Solution: ** The first command writes the string "hello, world" to the file test1.txt. If the file test1.txt already exists, then the contents of the existing file will be overwritten by the contents of the new text. However, if text1.txt file does not exist, then it will be created and the text will be written. The second command appends the string "hello, world" to the file test2.txt. In other words, if the file test2.txt already existed, the new string will be added to the end of the existing content. However, if the file test2.txt does not exist, it will be created and the text will be written to it. The >> operator is in indicator that the new content appends to the existing content in the file. 
 
 3.  Using your favorite text editor (e.g., `vi`), type the following and save the file as `middle.sh`:
 
@@ -471,3 +493,17 @@ Use `sudo apt install PKGNAME` to install required Ubuntu packages and `tlmgr in
 
 For grading purpose, include a screenshot of Section 4.1.5 of the book here.
 \`\`\`\`
+
+
+
+
+
+
+
+
+
+
+
+
+
+

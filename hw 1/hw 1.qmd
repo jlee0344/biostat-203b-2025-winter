@@ -54,7 +54,7 @@ This exercise (and later in this course) uses the [MIMIC-IV data v3.1](https://p
 Follow the instructions at <https://mimic.mit.edu/docs/gettingstarted/> to (1) complete the CITI `Data or Specimens Only Research` course and (2) obtain the PhysioNet credential for using the MIMIC-IV data.
 Display the verification links to your completion report and completion certificate here.
 **You must complete Q2 before working on the remaining questions.** (Hint: The CITI training takes a few hours and the PhysioNet credentialing takes a couple days; do not leave it to the last minute.)
-
+ot
 **Solution:** Here is the [Completion Report](https://www.citiprogram.org/verify/?ka99bf20e-e7bc-45a1-bdb0-d1f88046b522-67197093) of my CITI Training.
 
 Here is the [Completion Certification](https://www.citiprogram.org/verify/?w58649c8c-434a-4577-b55b-295333b28932-67197093) of my CITI Training.
@@ -109,7 +109,7 @@ The Bash command `zgrep`is used to search through a combination of uncompressed 
 
 4.  (Looping in Bash) What's the output of the following bash script?
 
-**(3.4) Solution:** The output of the following bash script is:
+**(3.4) Solution:** The output of the following bash script is down below. It is a list of the compressed (.gz) files that start with "a", "l", and "pa" in ~/mimic/hosp/. More specifically, the compressed files listed correspond to admissions, labevents, and patients. Information regarding the compressed files correspond to the file permissions, file sizes, dates and times, and file paths. 
 
 ```{bash}
 for datafile in ~/mimic/hosp/{a,l,pa}*.gz
@@ -126,10 +126,10 @@ Display the number of lines in each data file using a similar loop.
 ```{bash}
 for datafile in ~/mimic/hosp/{a,l,pa}*.gz
 do
+  echo $datafile 
   gzcat "$datafile" | wc -l
 done
 ```
-
 In summary, there are 546029 lines in the file 'admissions.csv.gz", there are 158374765 lines in the file 'labevents.csv.gz', and there are 364628 lines in the 'patients.csv.gz' data file. In the following code, we iterate through all the .gz files in the ~/mimic/hosp directory that matches the "a, l, pa" prefixes. The "gzcat" command decompresses each file and outputs its content to standard output. Afterwards, the "wc -l" command prints the number of lines in each iterated file. 
 
 5.  Display the first few lines of `admissions.csv.gz`. How many rows are in this data file, excluding the header line? Each `hadm_id` identifies a hospitalization. How many hospitalizations are in this data file? How many unique patients (identified by `subject_id`) are in this data file? Do they match the number of patients listed in the `patients.csv.gz` file? (Hint: combine Linux commands `zcat <`, `head`/`tail`, `awk`, `sort`, `uniq`, `wc`, and so on.)
@@ -291,14 +291,17 @@ ls -lh ~/mimic/hosp/labevents.csv
 ```
 
 The run times of `zcat < ~/mimic/labevents.csv.gz | wc -l` are displayed below: 
+
 ```{bash}
 time zcat < ~/mimic/hosp/labevents.csv.gz | wc -l
 ```
+
 The run time of `wc -l labevents.csv` are displayed below: 
 
 ```{bash}
 time wc -l ~/mimic/hosp/labevents.csv
 ```
+
 From the outputs above, we observe that the compressed .gz file is significantly smaller in size compared to the uncompressed file. However, running the same command to count the number of lines takes longer on the compressed file than on the uncompressed file. This highlights the trade-offs between storage and speed: while compressed files are more efficient in saving disk space, they require decompression, which increases processing time and computational resource usage. For large datasets, operations like wc -l are slower on compressed files compared to uncompressed ones, due to the added overhead of decompression (computational effort and use of more system resources such as CPU and memory). 
 
 We erase the 'labevents.csv' file before proceeding on the next exercise.
@@ -318,25 +321,23 @@ wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
 
 Explain what `wget -nc` does.
 
-**(4.1) Solution: ** The 'wget -nc' command is used to download a file from the internet. The '-nc' flag is used to prevent the download of the file if it already exists in the current directory. If the file already exists, the download will not be executed. 
+**(4.1) Solution: ** The 'wget -nc' command is used to download a file from the internet, retrieving files using HTTP, HTTPS, and FTP protocols. The '-nc' flag is used to prevent the download of the file if it already exists in the current directory. If a file with the same name is already downloaded, then the wget command will skip downloading the file. 
 
 Do **not** put this text file `pg42671.txt` in Git.
 
 Complete the following loop to tabulate the number of times each of the four characters is mentioned using Linux commands.
-There is an additional way to count the number of words (one line may contain the same name multiple times): 
 
+**Explanation of Code:** By utilizing the grep -o command, we are able to search for all the occurrences that the exact value of "$char" takes on in the pg42671.txt file. Every time an occurrence (in this case, a specific name) is detected, it outputs the specific name on a new line. The wc -l counts the number of lines or number of occurrences (names) there are in the entire pg42671.txt file. 
 
 ```{bash}
 #wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
 
 for char in Elizabeth Jane Lydia Darcy
 do
-  echo "$char: "
-  grep -o -i "$char" pg42671.txt | wc -l
+  echo "Count of $char: "
+  grep -o "$char" pg42671.txt | wc -l
 done
-
 ```
-
 2.  What's the difference between the following two commands?
 
 **(4.2) Solution: ** The first command writes the string "hello, world" to the file test1.txt. If the file test1.txt already exists, then the contents of the existing file will be overwritten by the contents of the new text. However, if text1.txt file does not exist, then it will be created and the text will be written. The second command appends the string "hello, world" to the file test2.txt. In other words, if the file test2.txt already existed, the new string will be added to the end of the existing content. However, if the file test2.txt does not exist, it will be created and the text will be written to it. The >> operator is in indicator that the new content appends to the existing content in the file. 
@@ -357,7 +358,7 @@ echo 'hello, world' >> test2.txt
 
 **(4.3) Solution: ** 
 
-I manually created middle.sh, set the output to false, and include middle.sh in the submission folder.
+I manually created the middle.sh file using the text editor nano and included middle.sh in the submission folder on Git. 
 
 ```{bash eval=FALSE}
 #!/bin/sh
@@ -366,26 +367,23 @@ I manually created middle.sh, set the output to false, and include middle.sh in 
 head -n "$2" "$1" | tail -n "$3"
 ```
 
-Using `chmod` to make the file executable by the owner, and run the following command to test the script: 
+Using `chmod` to make the file executable by the owner, and run the following command to test the script: (Note that instead of 20 5, I showcased the results for 18 6 to better understand the content of these lines)
 
 ```{bash}
-chmod +x middle.sh
-./middle.sh pg42671.txt 20 5
+chmod a+x middle.sh
+./middle.sh pg42671.txt 18 6
 ```
-
-Explain the output.
+Explain the output. 
 
 **Solution: ** 
-The output showcases that the release date of the book "Price and Prejudice" was May 9, 2013 (eBook $42671). 
-It also shows that the language is English. 
-
+The output showcases that the author of the book "Price and Prejudice is Jane Austen, the Editor is R.W Chapman, and the release date was May 9, 2013 (eBook $42671). We extracted lines 13-18 from the original text. 
 Explain the meaning of `"$1"`, `"$2"`, and `"$3"` in this shell script.
 
-**Solution: ** In this shelll script, the `"$1"` refers to the first argument passed to the script, which is the filename. The  `"$2"` refers to the second argument passed to the script, which is the end_line. The `"$3"` refers to the third argument passed to the script, which is the num_lines. 
+**Solution: ** In this shelll script, the `"$1"` refers to the first argument passed to the script, which is the pg42671.txt file. The  `"$2"` refers to the second argument passed to the script, which is the ending line number (line number 18). The `"$3"` refers to the third argument passed to the script, which is the num_lines or the number of lines to extract before and including the 18th line. In this case, we extract 6 lines from line number 18. 
 
 Why do we need the first line of the shell script?
 
-**Solution: ** We need the first line of the spell script beause it is a shebang line which is used to interpret the script. It tells the system which interpreter to use to execute the script. In this case, the shebang line is #!/bin/sh which tells the system to use the Bourne shell to interpret the script. 
+**Solution: ** The first line of the script is a shebang, which specifies the interpreter used to execute the script. It tells the system which shell or program should run the script. In this case, the shebang #!/bin/sh directs the system to use the Bourne shell as the interpreter.
 
 ## Q5. More fun with Linux
 
@@ -485,10 +483,22 @@ The time sleep 5 command showcases how long the operation takes to execute after
 time sleep 5 
 ```
 
-The history \| tail command showcases the last 10 commands that were executed.
+The history \| tail command showcases the last 10 commands that were executed in the terminal. 
 
 ```{bash}
 history | tail
+
+#My following output for this command on my terminal: 
+  #158  date
+  #159  hostname
+  #160  arch 
+  #161  uname 
+  #162  uptime
+  #163  who am i 
+  #164  history | tail
+  #165  wget
+  #166  wget -V
+  #167  cal  9 1752
 ```
 
 ## Q6. Book
@@ -506,13 +516,7 @@ For grading purpose, include a screenshot of Section 4.1.5 of the book here.
 \`\`\`\`
 
 **Solution: ** Here is the screenshot of Section 4.1.5 of the book: 
-```{bash}
-mv "/Users/julielee/Desktop/203b-hw/hw 1/screenshot_2025-01-20.png" screenshot_2025-01-20.png
-```
 
 ![Section 4.1.5](/Users/julielee/Desktop/203b-hw/hw 1/screenshot_2025-01-20.png)
 
-
-
-
-
+#This is the end of Homework #1 

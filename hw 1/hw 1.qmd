@@ -54,7 +54,8 @@ This exercise (and later in this course) uses the [MIMIC-IV data v3.1](https://p
 Follow the instructions at <https://mimic.mit.edu/docs/gettingstarted/> to (1) complete the CITI `Data or Specimens Only Research` course and (2) obtain the PhysioNet credential for using the MIMIC-IV data.
 Display the verification links to your completion report and completion certificate here.
 **You must complete Q2 before working on the remaining questions.** (Hint: The CITI training takes a few hours and the PhysioNet credentialing takes a couple days; do not leave it to the last minute.)
-ot
+
+
 **Solution:** Here is the [Completion Report](https://www.citiprogram.org/verify/?ka99bf20e-e7bc-45a1-bdb0-d1f88046b522-67197093) of my CITI Training.
 
 Here is the [Completion Certification](https://www.citiprogram.org/verify/?w58649c8c-434a-4577-b55b-295333b28932-67197093) of my CITI Training.
@@ -327,7 +328,7 @@ Do **not** put this text file `pg42671.txt` in Git.
 
 Complete the following loop to tabulate the number of times each of the four characters is mentioned using Linux commands.
 
-**Explanation of Code:** By utilizing the grep -o command, we are able to search for all the occurrences that the exact value of "$char" takes on in the pg42671.txt file. Every time an occurrence (in this case, a specific name) is detected, it outputs the specific name on a new line. The wc -l counts the number of lines or number of occurrences (names) there are in the entire pg42671.txt file. 
+**Explanation of Code:** By utilizing the grep -o, we are able to search for all the occurrences that the exact value of "$char" takes on in the pg42671.txt file. Every time an occurrence (in this case, a specific name) is detected, it outputs the specific name on a new line. The wc -l counts the number of lines or number of occurrences (names) there are in the entire pg42671.txt file. 
 
 ```{bash}
 #wget -nc http://www.gutenberg.org/cache/epub/42671/pg42671.txt
@@ -377,6 +378,7 @@ Explain the output.
 
 **Solution: ** 
 The output showcases that the author of the book "Price and Prejudice is Jane Austen, the Editor is R.W Chapman, and the release date was May 9, 2013 (eBook $42671). We extracted lines 13-18 from the original text. 
+
 Explain the meaning of `"$1"`, `"$2"`, and `"$3"` in this shell script.
 
 **Solution: ** In this shelll script, the `"$1"` refers to the first argument passed to the script, which is the pg42671.txt file. The  `"$2"` refers to the second argument passed to the script, which is the ending line number (line number 18). The `"$3"` refers to the third argument passed to the script, which is the num_lines or the number of lines to extract before and including the 18th line. In this case, we extract 6 lines from line number 18. 

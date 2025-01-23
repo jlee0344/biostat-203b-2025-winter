@@ -1,7 +1,7 @@
 ---
 title: "Biostat 203B Homework 1"
 subtitle: Due Jan 24, 2025 @ 11:59PM
-author: Julie Lee, 806409381 
+author: Julie Lee and 806409381 
 format:
   html:
     theme: cosmo
@@ -13,11 +13,7 @@ format:
     code-fold: false
     link-external-icon: true
     link-external-newwindow: true
-editor: 
-  markdown: 
-    wrap: sentence
 ---
-
 Display machine information for reproducibility:
 
 ```{r}
@@ -180,6 +176,7 @@ Now, let's first peek the first few lines of the patient.csv.gz file:
 ```{bash}
 zcat < ~/mimic/hosp/patients.csv.gz | head 
 ```
+
 The number of patients listed in this patients.csv.gz file is 364627 patients. Recall that the number of unique patients that are in the admission.csv.gz file(identified by subject_id) is 223452 patients. These 2 numbers do not match as the number of patients listed in the patients.csv.gv file is greater than the number of unique patients in the admissions.csv.gz file. 
 
 ```{bash}
@@ -342,6 +339,8 @@ done
 
 2.  What's the difference between the following two commands?
 
+**(4.2) Solution: ** The first command writes the string "hello, world" to the file test1.txt. If the file test1.txt already exists, then the contents of the existing file will be overwritten by the contents of the new text. However, if text1.txt file does not exist, then it will be created and the text will be written. The second command appends the string "hello, world" to the file test2.txt. In other words, if the file test2.txt already existed, the new string will be added to the end of the existing content. However, if the file test2.txt does not exist, it will be created and the text will be written to it. The >> operator is in indicator that the new content appends to the existing content in the file. 
+
 ```{bash}
 #| eval: false
 echo 'hello, world' > test1.txt
@@ -354,9 +353,11 @@ and
 echo 'hello, world' >> test2.txt
 ```
 
-**(4.2) Solution: ** The first command writes the string "hello, world" to the file test1.txt. If the file test1.txt already exists, then the contents of the existing file will be overwritten by the contents of the new text. However, if text1.txt file does not exist, then it will be created and the text will be written. The second command appends the string "hello, world" to the file test2.txt. In other words, if the file test2.txt already existed, the new string will be added to the end of the existing content. However, if the file test2.txt does not exist, it will be created and the text will be written to it. The >> operator is in indicator that the new content appends to the existing content in the file. 
-
 3.  Using your favorite text editor (e.g., `vi`), type the following and save the file as `middle.sh`:
+
+**(4.3) Solution: ** 
+
+I manually created middle.sh, set the output to false, and include middle.sh in the submission folder.
 
 ```{bash eval=FALSE}
 #!/bin/sh
@@ -365,16 +366,26 @@ echo 'hello, world' >> test2.txt
 head -n "$2" "$1" | tail -n "$3"
 ```
 
-Using `chmod` to make the file executable by the owner, and run
+Using `chmod` to make the file executable by the owner, and run the following command to test the script: 
 
 ```{bash}
-#| eval: false
+chmod +x middle.sh
 ./middle.sh pg42671.txt 20 5
 ```
 
 Explain the output.
+
+**Solution: ** 
+The output showcases that the release date of the book "Price and Prejudice" was May 9, 2013 (eBook $42671). 
+It also shows that the language is English. 
+
 Explain the meaning of `"$1"`, `"$2"`, and `"$3"` in this shell script.
+
+**Solution: ** In this shelll script, the `"$1"` refers to the first argument passed to the script, which is the filename. The  `"$2"` refers to the second argument passed to the script, which is the end_line. The `"$3"` refers to the third argument passed to the script, which is the num_lines. 
+
 Why do we need the first line of the shell script?
+
+**Solution: ** We need the first line of the spell script beause it is a shebang line which is used to interpret the script. It tells the system which interpreter to use to execute the script. In this case, the shebang line is #!/bin/sh which tells the system to use the Bourne shell to interpret the script. 
 
 ## Q5. More fun with Linux
 
@@ -493,5 +504,15 @@ Use `sudo apt install PKGNAME` to install required Ubuntu packages and `tlmgr in
 
 For grading purpose, include a screenshot of Section 4.1.5 of the book here.
 \`\`\`\`
-![Section 4.1.5](/Users/julielee/Desktop/Screenshot 2025-01-20 at 12.10.15 AM.png)
+
+**Solution: ** Here is the screenshot of Section 4.1.5 of the book: 
+```{bash}
+mv "/Users/julielee/Desktop/203b-hw/hw 1/screenshot_2025-01-20.png" screenshot_2025-01-20.png
+```
+
+![Section 4.1.5](/Users/julielee/Desktop/203b-hw/hw 1/screenshot_2025-01-20.png)
+
+
+
+
 

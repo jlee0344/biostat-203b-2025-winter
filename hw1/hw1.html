@@ -3186,7 +3186,7 @@ loaded via a namespace (and not attached):
 -rw-r--r--@  1 julielee  staff        15199 Oct 10 16:29 CHANGELOG.txt
 -rw-r--r--@  1 julielee  staff         2518 Oct 10 17:30 LICENSE.txt
 -rw-r--r--@  1 julielee  staff         2884 Oct 11 17:55 SHA256SUMS.txt
-drwxr-xr-x@ 24 julielee  staff          768 Jan 23 15:59 hosp
+drwxr-xr-x@ 24 julielee  staff          768 Jan 23 17:35 hosp
 drwxr-xr-x@ 11 julielee  staff          352 Jan 16 00:51 icu
 -rw-r--r--   1 julielee  staff  18402851720 Jan 19 21:09 labevents.csv</code></pre>
 </div>
@@ -3536,7 +3536,7 @@ drwxr-xr-x@ 11 julielee  staff          352 Jan 16 00:51 icu
 <div class="sourceCode cell-code" id="cb43"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="fu">gzip</span> <span class="at">-dk</span> <span class="op">&lt;</span> ~/mimic/hosp/labevents.csv.gz <span class="op">&gt;</span> ~/mimic/hosp/labevents.csv</span>
 <span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> <span class="at">-lh</span> ~/mimic/hosp/labevents.csv</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>-rw-r--r--  1 julielee  staff    17G Jan 23 16:10 /Users/julielee/mimic/hosp/labevents.csv</code></pre>
+<pre><code>-rw-r--r--  1 julielee  staff    17G Jan 23 17:40 /Users/julielee/mimic/hosp/labevents.csv</code></pre>
 </div>
 </div>
 <p>The run times of <code>zcat &lt; ~/mimic/labevents.csv.gz | wc -l</code> are displayed below:</p>
@@ -3545,9 +3545,9 @@ drwxr-xr-x@ 11 julielee  staff          352 Jan 16 00:51 icu
 <div class="cell-output cell-output-stdout">
 <pre><code> 158374765
 
-real    0m40.139s
-user    0m44.978s
-sys 0m10.524s</code></pre>
+real    0m38.403s
+user    0m43.720s
+sys 0m10.417s</code></pre>
 </div>
 </div>
 <p>The run time of <code>wc -l labevents.csv</code> are displayed below:</p>
@@ -3556,9 +3556,9 @@ sys 0m10.524s</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code> 158374765 /Users/julielee/mimic/hosp/labevents.csv
 
-real    0m36.294s
-user    0m28.243s
-sys 0m5.007s</code></pre>
+real    0m54.498s
+user    0m30.415s
+sys 0m9.095s</code></pre>
 </div>
 </div>
 <p>From the outputs above, we observe that the compressed .gz file is significantly smaller in size compared to the uncompressed file. However, running the same command to count the number of lines takes longer on the compressed file than on the uncompressed file. This highlights the trade-offs between storage and speed: while compressed files are more efficient in saving disk space, they require decompression, which increases processing time and computational resource usage. For large datasets, operations like wc -l are slower on compressed files compared to uncompressed ones, due to the added overhead of decompression (computational effort and use of more system resources such as CPU and memory).</p>
@@ -3718,14 +3718,14 @@ Su Mo Tu We Th Fr Sa
 <div class="cell">
 <div class="sourceCode cell-code" id="cb64"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="fu">date</span> </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Thu Jan 23 16:11:35 PST 2025</code></pre>
+<pre><code>Thu Jan 23 17:42:31 PST 2025</code></pre>
 </div>
 </div>
 <p>The “hostname” command showcases the hostname of the current system.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb66"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="fu">hostname</span> </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>julies-laptop-2.ad.medctr.ucla.edu</code></pre>
+<pre><code>Julies-Laptop-2.local</code></pre>
 </div>
 </div>
 <p>The “arch” command showcases the hardware architecture of the current system.</p>
@@ -3739,37 +3739,41 @@ Su Mo Tu We Th Fr Sa
 <div class="cell">
 <div class="sourceCode cell-code" id="cb70"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="fu">uname</span> <span class="at">-a</span> </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Darwin julies-laptop-2.ad.medctr.ucla.edu 23.0.0 Darwin Kernel Version 23.0.0: Fri Sep 15 14:42:57 PDT 2023; root:xnu-10002.1.13~1/RELEASE_ARM64_T8112 arm64</code></pre>
+<pre><code>Darwin Julies-Laptop-2.local 23.0.0 Darwin Kernel Version 23.0.0: Fri Sep 15 14:42:57 PDT 2023; root:xnu-10002.1.13~1/RELEASE_ARM64_T8112 arm64</code></pre>
 </div>
 </div>
 <p>The uptime command showcases how long the machine has been running, system load averages, and the number of users logged in.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb72"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="fu">uptime</span> </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>16:11  up 4 days,  2:04, 1 user, load averages: 4.65 4.42 4.57</code></pre>
+<pre><code>17:42  up 4 days,  3:35, 3 users, load averages: 13.13 7.37 5.90</code></pre>
 </div>
 </div>
 <p>The who am i command showcases the current user logged in (username) and login time.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb74"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="fu">who</span> am i </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>julielee                      Jan 23 16:11 </code></pre>
+<pre><code>julielee                      Jan 23 17:42 </code></pre>
 </div>
 </div>
 <p>The who command showcases the list of all currently logged-in users.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb76"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a><span class="fu">who</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>julielee         console      Jan 19 23:57 </code></pre>
+<pre><code>julielee         ttys000      Jan 23 17:11 
+julielee         console      Jan 19 23:57 
+julielee         ttys001      Jan 23 17:11 </code></pre>
 </div>
 </div>
 <p>The w command showcases information regarding the users who are currently logged into the system and their activities. It includes system information including the current time, how long the system has been running, and the number of users logged in. It includes user information including usernmae, terminal decive, login time, idle time, and current directory used.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb78"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a><span class="fu">w</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>16:11  up 4 days,  2:04, 1 user, load averages: 4.65 4.42 4.57
+<pre><code>17:42  up 4 days,  3:35, 3 users, load averages: 13.13 7.37 5.90
 USER     TTY      FROM              LOGIN@  IDLE WHAT
-julielee console  -                Sun23   3days -</code></pre>
+julielee s000     -                17:11      31 -zsh
+julielee console  -                Sun23   3days -
+julielee s001     -                17:11      11 -zsh</code></pre>
 </div>
 </div>
 <p>The id command showcases the user ID, groupID, user name, and the groups for the current user.</p>
@@ -3783,16 +3787,16 @@ julielee console  -                Sun23   3days -</code></pre>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb82"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb82-1"><a href="#cb82-1" aria-hidden="true" tabindex="-1"></a><span class="fu">last</span> <span class="kw">|</span> <span class="fu">head</span> </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>julielee   ttys000                         Thu Jan 23 13:23 - 13:23  (00:00)
+<pre><code>julielee   ttys001                         Thu Jan 23 17:11   still logged in
+julielee   ttys000                         Thu Jan 23 17:11   still logged in
+julielee   ttys000                         Thu Jan 23 13:23 - 13:23  (00:00)
 julielee   ttys000                         Wed Jan 22 21:24 - 21:24  (00:00)
 julielee   ttys000                         Wed Jan 22 21:08 - 21:08  (00:00)
 julielee   ttys000                         Wed Jan 22 20:33 - 20:33  (00:00)
 julielee   ttys000                         Wed Jan 22 20:31 - 20:31  (00:00)
 julielee   ttys000                         Wed Jan 22 20:28 - 20:28  (00:00)
 julielee   ttys000                         Wed Jan 22 18:08 - 18:08  (00:00)
-julielee   ttys000                         Wed Jan 22 17:11 - 17:11  (00:00)
-julielee   ttys000                         Wed Jan 22 16:59 - 16:59  (00:00)
-julielee   ttys000                         Wed Jan 22 16:55 - 16:55  (00:00)</code></pre>
+julielee   ttys000                         Wed Jan 22 17:11 - 17:11  (00:00)</code></pre>
 </div>
 </div>
 <p>The echo {con, pre} {sent,fer}{s,ed} command showcases different combinations of words.</p>
@@ -3807,9 +3811,9 @@ julielee   ttys000                         Wed Jan 22 16:55 - 16:55  (00:00)</co
 <div class="sourceCode cell-code" id="cb86"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb86-1"><a href="#cb86-1" aria-hidden="true" tabindex="-1"></a><span class="bu">time</span> sleep 5 </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
-real    0m5.009s
-user    0m0.000s
-sys 0m0.001s</code></pre>
+real    0m5.013s
+user    0m0.001s
+sys 0m0.005s</code></pre>
 </div>
 </div>
 <p>The history | tail command showcases the last 10 commands that were executed in the terminal.</p>

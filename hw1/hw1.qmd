@@ -522,8 +522,7 @@ For grading purpose, include a screenshot of Section 4.1.5 of the book here.
 ```{r, echo = FALSE}
 knitr::include_graphics("/Users/julielee/Desktop/203b-hw/hw1/screenshot.png")
 ```
-
-Completion of Homeowrk #1
+Completion of Homeowrk #1.
 
 
 

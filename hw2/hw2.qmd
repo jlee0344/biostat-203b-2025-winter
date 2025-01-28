@@ -56,9 +56,65 @@ There are quite a few utilities in R for reading plain text data files. Let us t
 
 Which function is fastest? Is there difference in the (default) parsed data types? How much memory does each resultant dataframe or tibble use? (Hint: `system.time` measures run times; `pryr::object_size` measures memory usage; all these readers can take gz file as input without explicit decompression.) 
 
+**Solution 1.1** 
+The function that is the fastest is the 
+There is a difference in the default parsed data types. 
+The amount of ememory that each resultant dataframe or tibble use is 
+
+
+```{bash}
+
+zcat < ~/mimic/hosp/admissions.csv.gz | 
+
+
+# Define the file to read
+file <- "~/mimic/hosp/admissions.csv.gz"
+
+# 1. Measure time and memory for read.csv
+base_r_time <- system.time({
+  base_r_data <- read.csv(file)
+})
+base_r_memory <- object_size(base_r_data)
+
+# 2. Measure time and memory for read_csv (tidyverse)
+tidyverse_time <- system.time({
+  tidyverse_data <- read_csv(file)
+})
+tidyverse_memory <- object_size(tidyverse_data)
+
+# 3. Measure time and memory for fread (data.table)
+data_table_time <- system.time({
+  data_table_data <- fread(file)
+})
+data_table_memory <- object_size(data_table_data)
+
+# Print results
+cat("Results:\n")
+cat("1. Base R (read.csv):\n")
+cat("   Time: ", base_r_time["elapsed"], " seconds\n")
+cat("   Memory: ", base_r_memory, " bytes\n\n")
+
+cat("2. Tidyverse (read_csv):\n")
+cat("   Time: ", tidyverse_time["elapsed"], " seconds\n")
+cat("   Memory: ", tidyverse_memory, " bytes\n\n")
+
+cat("3. Data.table (fread):\n")
+cat("   Time: ", data_table_time["elapsed"], " seconds\n")
+cat("   Memory: ", data_table_memory, " bytes\n\n")
+EOF
+
+Rscript test_read_speed.R
+```
+
+
 ### Q1.2 User-supplied data types
 
 Re-ingest `admissions.csv.gz` by indicating appropriate column data types in `read_csv`. Does the run time change? How much memory does the result tibble use? (Hint: `col_types` argument in `read_csv`.)
+
+```{bash}
+
+```
+
 
 ## Q2. Ingest big data files
 
@@ -137,6 +193,8 @@ Write a few sentences to explain what is DuckDB. Imagine you want to explain it 
 ```{bash}
 zcat < ~/mimic/icu/chartevents.csv.gz | head -10
 ```
+
+
 How many rows? 433 millions.
 ```{bash}
 #| eval: false

@@ -1,7 +1,7 @@
 ---
 title: "Biostat 203B Homework 2"
 subtitle: Due Feb 7, 2025 @ 11:59PM
-author: "Your Name and UID"
+author: "Julie Lee"
 format:
   html:
     theme: cosmo
@@ -132,6 +132,7 @@ Ingest the Parquet file, convert it to a DuckDB table by [`arrow::to_duckdb`](ht
 Write a few sentences to explain what is DuckDB. Imagine you want to explain it to a layman in an elevator.
 
 **(2.6) Solution **
+
 
 ## Q3. Ingest and filter `chartevents.csv.gz`
 

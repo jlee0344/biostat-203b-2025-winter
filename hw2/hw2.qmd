@@ -173,47 +173,6 @@ In later exercises, we will only be interested in the following lab items: creat
 Display the first 10 lines of the new file `labevents_filtered.csv.gz`. How many lines are in this new file, excluding the header? How long does it take `read_csv` to ingest `labevents_filtered.csv.gz`?
 
 **(2.3) Solution ** 
-```{bash}
-#| eval: false 
-zcat < ~/mimic/hosp/labevents.csv.gz | awk -F, '
-    BEGIN { OFS="," }
-    NR==1 || ($2 == 50912 || $2 == 50971 || $2 == 50983 || $2 == 50902 || $2 == 50882 || $2 == 51221 || $2 == 51301 || $2 == 50931) {
-        print $1, $2, $3, $4
-    }' | gzip > labevents_filtered.csv.gz
-```
-Checking the First 10 Lines of the New File 
-```{bash}
-zcat < labevents_filtered.csv.gz | head -n 10
-```
-
-
-Counting the number of Lines (Excluding the Header) 
-```{bash}
-zcat < labevents_filtered.csv.gz | tail -n +2 | wc -l
-```
-
-Measuring read_csv Ingestion Time in R (using readr package) 
-```{r}
-# Measure time taken to read the filtered CSV file
-start_time <- Sys.time()
-
-# Read the filtered dataset
-df_filtered <- read_csv("labevents_filtered.csv.gz")
-
-end_time <- Sys.time()
-
-# Print the time taken
-print(end_time - start_time)
-
-# Display first few rows
-head(df_filtered)
-
-# Check structure of the dataset
-str(df_filtered)
-
-# Count number of rows
-nrow(df_filtered)
-```
 
 
 ### Q2.4 Ingest `labevents.csv` by Apache Arrow

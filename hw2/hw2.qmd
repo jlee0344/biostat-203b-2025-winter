@@ -211,22 +211,20 @@ The second attempt using the provided R Server successfully ingested 'labevents.
 Try to ingest only columns `subject_id`, `itemid`, `charttime`, and `valuenum` in `labevents.csv.gz` using `read_csv`.  Does this solve the ingestion issue? (Hint: `col_select` argument in `read_csv`.)
 
 ```{r}
-# Measure time & memory for selective column ingestion
 time_selected <- system.time(
   df_selected <- read_csv(file_path_labevents, col_select = c("subject_id", "itemid", "charttime", "valuenum"))
 )
 size_selected <- object_size(df_selected)
 
-# Print results
 cat("Elapsed Time (seconds):", time_selected["elapsed"], "\n")
 cat("Memory Usage (bytes):", size_selected, "\n")
 
-# Display first few rows
 head(df_selected)
 ```
 
 **(2.2) Solution ** 
 By selecting only four columns (subject_id, itemid, charttime, and valuenum) when ingesting labevents.csv.gz using read_csv(), the process took 159.211 seconds (2.65 minutes) and used 5.07 GB (5,067,997,752 bytes) of memory. Comparing this to ingesting the entire file without column selection—where the memory usage was 19,337.91 MB (≈19 GB) and the ingestion time was 197.825 seconds (3.25 minutes)—we observe a notable improvement in both memory efficiency and processing time.This suggests that while read_csv() is capable of handling large dataset ingestion, it is not the most efficient option due to its high memory consumption and relatively slow processing speed. Selecting only the necessary columns significantly reduces memory usage and speeds up ingestion, making it a more practical approach for handling large datasets efficiently.
+
 
 ### Q2.3 Ingest a subset of `labevents.csv.gz`
 
@@ -240,17 +238,53 @@ In later exercises, we will only be interested in the following lab items: creat
 
 Display the first 10 lines of the new file `labevents_filtered.csv.gz`. How many lines are in this new file, excluding the header? How long does it take `read_csv` to ingest `labevents_filtered.csv.gz`?
 
-**(2.3) Solution ** 
+```{bash}
+#l eval: false
+
+zcat ~/mimic/hosp/labevents.csv.gz |
+  awk -F, 'BEGIN {OFS=","; print "subject_id,itemid,charttime,valuenum"}
+  NR==1 {next}
+  $5 ~ /^[0-9]+$/ && ($5 == 50912 || $5 == 50971 || $5 == 50983 || $5 == 50902 || 
+  $5 == 50882 || $5 == 51221 || $5 == 51301 || $5 == 50931) &&
+  $2 != "" && $7 != "" && $10 != "" {
+      print $2,$5,$7,$10
+  }' |
+  gzip > labevents_filtered.csv.gz
+```
 
 ```{bash}
-#| eval: false
-zcat ~/mimic/hosp/labevents.csv.gz | awk -F, '
-    BEGIN { OFS = "," }
-    NR == 1 || ($2 == 50912 || $2 == 50971 || $2 == 50983 || $2 == 50902 || $2 == 50882 || $2 == 51221 || $2 == 51301 || $2 == 50931) {
-        print $1, $2, $3, $4
-    }
-' | gzip > labevents_filtered.csv.gz
+#l eval: false 
+
+#!/bin/bash
+
+file="labevents_filtered.csv.gz"
+echo "First 10 lines of the file (including the header):"
+zcat "$file" | head -n 10
 ```
+
+```{bash}
+#Number of Lines in New File excluding the header 
+file="labevents_filtered.csv.gz"
+line_count=$(zcat "$file" | tail -n +2 | wc -l)
+echo "Number of lines in the file (excluding the header): $line_count"
+```
+
+
+```{bash}
+
+#l eval: false 
+file="labevents_filtered.csv.gz"
+echo -e "\nMeasuring read time in R..."
+Rscript -e "
+start_time <- Sys.time()
+df <- read.csv(gzfile('$file'))
+end_time <- Sys.time()
+print(paste('Time taken to ingest the file using read.csv():', round(difftime(end_time, start_time, units='secs'), 4), 'seconds'))
+"
+```
+
+**(2.3) Solution ** 
+After manually checking the specific columns that correspond to "subject_id", "itemid", "charttime", and "valuenum" and filtering out rows that only have lab items creatinine (50912), potassium (50971), sodium (50983), chloride (50902), bicarbonate (50882), hematocrit (51221), white blood cell count (51301), and glucose (50931), we created the labevents_filtered.csv.gz. The number of lines in the new file (labevents_filtered.csv.gz) excluding the header is 32651024 lines. The time it takes to ingest the `labevents_filtered.csv.gz` file using the function read_csv is 51.0504 seconds. 
 
 
 ### Q2.4 Ingest `labevents.csv` by Apache Arrow

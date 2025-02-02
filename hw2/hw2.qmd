@@ -89,19 +89,22 @@ The fastest function in R for reading a plain text data file, specifically the c
 
 We investigate the difference in the (default) parsed data types: 
 
-The read.csv (Base R) by default, converts character columns into factors. 
+The read.csv (Base R) by default, converts character columns into factors. We notice that the variables subject_id, hadm_id are set to integers. All of the other variables are set to factors. 
+
 ```{r}
 cat("Base R (read.csv):\n")
 str(df_base)
 ```
 
-The read_csv Tidyverse function does not convert character columns to factors by default. 
+The read_csv Tidyverse function does not convert character columns to factors by default. We notice that the variables subject_id, hadm_id, and hospital_expire_flag are set to numbers. The variables admittime, dischtime,  deathtime, edregtime, and edouttime are set to numbers, and all other variables are set to characters. 
+
 ```{r}
 cat("\nTidyverse (read_csv):\n")
 str(df_tidy)
 ```
 
-The fread (Data.Table) function automatically detects the approprotiates column types (numeric, character, etc) 
+The fread (Data.Table) function automatically detects the appropriate column types (numeric, character, etc). We notice that the variables subject_id, hadm_id, hospital_expire_flag are set to integers, the variables admittime, dischtime, deathtime, edregtime, and edouttime are set to POSIXct, and the rest of the variables are set to characters. 
+
 ```{r}
 cat("\nData.table (fread):\n")
 str(df_dt)             
@@ -112,6 +115,11 @@ str(df_dt)
 Re-ingest `admissions.csv.gz` by indicating appropriate column data types in `read_csv`. Does the run time change? How much memory does the result tibble use? (Hint: `col_types` argument in `read_csv`.)
 
 ```{r} 
+file_path <- "~/mimic/hosp/admissions.csv.gz"
+
+time_tidy_default <- system.time(df_tidy_default <- read_csv(file_path))
+size_tidy_default <- object_size(df_tidy_default)
+
 col_types <- cols(
   subject_id = col_double(),
   hadm_id = col_double(),
@@ -131,27 +139,23 @@ col_types <- cols(
   hospital_expire_flag = col_double()
 )
 
-#Run Times 
-time_tidy_coltypes <- system.time(
-  df_tidy_coltypes <- read_csv(file_path, col_types = col_types)
+time_tidy_optimized <- system.time(
+  df_tidy_optimized <- read_csv(file_path, col_types = col_types)
+)
+size_tidy_optimized <- object_size(df_tidy_optimized)
+
+results <- data.frame(
+  Method = c("read_csv (Default)", "read_csv (Appropriate Column Data Types)"),
+  ElapsedTime = c(time_tidy_default["elapsed"], time_tidy_optimized["elapsed"]),
+  MemoryUsage = c(size_tidy_default, size_tidy_optimized)
 )
 
-#Memory Usage 
-size_tidy_coltypes <- object_size(df_tidy_coltypes)
-
-# Print runtime and memory usage
-cat("Runtime (Elapsed Time):\n")
-print(time_tidy_coltypes["elapsed"])
-
-cat("\nMemory usage (bytes):\n")
-print(size_tidy_coltypes)
+print(results)
 
 ```
 
-
 **(1.2) Solution ** 
-When we re-ingest admissions.csv.gz with specified column types, we are able to see that the file size remains 19M, the time taken to read the file is 2.413394 seconds, and the memory usage of the resulting tibble is 60.53 MB. 
-
+When we re-ingest admissions.csv.gz with specified column types, we observe that the memory usage remains unchanged at 70.02 MB, consistent with the default ingestion. However, specifying column types leads to a noticeable improvement in performance, reducing the elapsed time from 1.371 seconds to 1.010 seconds. This demonstrates that while explicitly defining column types does not impact memory consumption, it optimizes parsing speed, making the data loading process more efficient. Thus, for large datasets, pre-defining column types can be beneficial in enhancing performance.
 
 ## Q2. Ingest big data files
 

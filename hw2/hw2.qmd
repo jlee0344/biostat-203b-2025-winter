@@ -182,41 +182,51 @@ zcat < ~/mimic/hosp/labevents.csv.gz | head -10
 Try to ingest `labevents.csv.gz` using `read_csv`. What happens? If it takes more than 3 minutes on your computer, then abort the program and report your findings. 
 
 Using the read_csv function from the readr package. 
+
 ```{r}
 file_path_labevents <- "~/mimic/hosp/labevents.csv.gz"
+cat("\n=== Ingesting 'labevents.csv.gz' using read_csv() ===\n")
 
-time_taken <- microbenchmark(
-  df <- read_csv(file_path_labevents),  
-  times = 1  
-)
-print(time_taken)
-head(df)
+time_full <- system.time({
+  df_full <- read_csv(file_path_labevents)  # Ingest the file
+})
+
+size_full <- object_size(df_full)
+
+cat("\n=== Ingestion Performance Metrics ===\n")
+cat("Elapsed Time (seconds):", time_full["elapsed"], "\n")
+cat("Memory Usage (MB):", size_full / (1024^2), "\n")
+print(head(df_full))
+
 ```
 
 **(2.1) Solution ** 
 
 First attempt using R Server from Laptop: Attempting to ingest 'labevents.csv.gz' using read_csv() (from the readr package) in R crashed due to my Mac’s 8GB RAM, which is insufficient for handling the 18.4GB decompressed file. Since R loads data entirely into memory, it requires approximately twice the file size (~36.8GB RAM), causing a memory overflow. To handle large files efficiently, alternatives include using chunked processing with read_csv(). This crash is expected because R primarily operates in-memory (RAM) rather than efficiently streaming large datasets. When using read_csv(), R attempts to load the entire dataset into RAM instead of processing it in chunks. If the available memory is insufficient, the system quickly runs out of resources, leading to an R session crash. This limitation makes handling large datasets challenging without proper memory management techniques.
 
-Second attempt using the provided R Server: Attemping to ingest 'labevents.csv.gz' using read_csv() (from the readr package) in R did not crash and was able to showcase the first 6 rows of the file "labevents.csv.gz". 
+The second attempt using the provided R Server successfully ingested 'labevents.csv.gz' using read_csv() from the readr package without crashing. The function was able to display the first six rows of the dataset. However, the ingestion process was slow, taking approximately 197.825 seconds (3.29 minutes) to fully load the file. Additionally, the memory usage was 19,337.91 MB (≈19 GB). This suggests that while read_csv() can handle the ingestion, it may not be the most efficient option for large datasets due to high memory consumption and long processing times. 
 
 ### Q2.2 Ingest selected columns of `labevents.csv.gz` by `read_csv`
 
 Try to ingest only columns `subject_id`, `itemid`, `charttime`, and `valuenum` in `labevents.csv.gz` using `read_csv`.  Does this solve the ingestion issue? (Hint: `col_select` argument in `read_csv`.)
 
 ```{r}
-# Measure ingestion time while selecting only the required columns
-time_taken <- microbenchmark(
-  df_only_columns <- read_csv(file_path_labevents, col_select = c("subject_id", "itemid", "charttime", "valuenum")),
-  times = 1
+# Measure time & memory for selective column ingestion
+time_selected <- system.time(
+  df_selected <- read_csv(file_path_labevents, col_select = c("subject_id", "itemid", "charttime", "valuenum"))
 )
+size_selected <- object_size(df_selected)
 
-# Print time taken and preview first few rows
-print(time_taken)
-head(df_only_columns)
+# Print results
+cat("Elapsed Time (seconds):", time_selected["elapsed"], "\n")
+cat("Memory Usage (bytes):", size_selected, "\n")
+
+# Display first few rows
+head(df_selected)
 ```
 
 **(2.2) Solution ** 
-By selecting only 4 columns (subject_id, itemid, charttime, and valuenum) 
+By selecting only four columns (subject_id, itemid, charttime, and valuenum) when ingesting labevents.csv.gz using read_csv(), the process took 159.211 seconds (2.65 minutes) and used 5.07 GB (5,067,997,752 bytes) of memory. Comparing this to ingesting the entire file without column selection—where the memory usage was 19,337.91 MB (≈19 GB) and the ingestion time was 197.825 seconds (3.25 minutes)—we observe a notable improvement in both memory efficiency and processing time.This suggests that while read_csv() is capable of handling large dataset ingestion, it is not the most efficient option due to its high memory consumption and relatively slow processing speed. Selecting only the necessary columns significantly reduces memory usage and speeds up ingestion, making it a more practical approach for handling large datasets efficiently.
 
 ### Q2.3 Ingest a subset of `labevents.csv.gz`
 
@@ -243,55 +253,6 @@ zcat ~/mimic/hosp/labevents.csv.gz | awk -F, '
 ```
 
 
-```{bash}
-#!/bin/bash
-
-# Define file paths
-INPUT_FILE=~/mimic/hosp/labevents.csv.gz
-OUTPUT_FILE=labevents_filtered.csv.gz
-
-# Start timing the extraction process
-START_TIME=$(date +%s)
-
-# Extract required columns and filter for specified itemid values
-zcat < "$INPUT_FILE" | awk -F',' '
-    BEGIN {OFS=",";}
-    NR==1 {
-        for (i=1; i<=NF; i++) col[$i] = i;
-        print "subject_id,itemid,charttime,valuenum";
-    }
-    NR>1 && ($col["itemid"] ~ /^(50912|50971|50983|50902|50882|51221|51301|50931)$/) {
-        print $col["subject_id"], $col["itemid"], $col["charttime"], $col["valuenum"];
-    }
-' | gzip > "$OUTPUT_FILE"
-
-# End timing the extraction process
-END_TIME=$(date +%s)
-echo "Time taken to filter and compress: $((END_TIME - START_TIME)) seconds"
-
-# Display first 10 lines of the new file
-echo "First 10 lines of the filtered file:"
-zcat < "$OUTPUT_FILE" | head -10
-
-# Count the number of lines excluding the header
-LINE_COUNT=$(zcat < "$OUTPUT_FILE" | wc -l)
-echo "Number of lines (excluding header): $((LINE_COUNT - 1))"
-
-# Start timing the read process
-READ_START_TIME=$(date +%s)
-
-# Measure read time by simply counting lines
-zcat < "$OUTPUT_FILE" | wc -l > /dev/null
-
-# End timing the read process
-READ_END_TIME=$(date +%s)
-echo "Time taken to read file: $((READ_END_TIME - READ_START_TIME)) seconds"
-
-```
-
-
-
-
 ### Q2.4 Ingest `labevents.csv` by Apache Arrow
 
 <p align="center">
@@ -303,6 +264,46 @@ Our second strategy is to use [Apache Arrow](https://arrow.apache.org/) for larg
 Then use [`arrow::open_dataset`](https://arrow.apache.org/docs/r/reference/open_dataset.html) to ingest `labevents.csv`, select columns, and filter `itemid` as in Q2.3. How long does the ingest+select+filter process take? Display the number of rows and the first 10 rows of the result tibble, and make sure they match those in Q2.3. (Hint: use `dplyr` verbs for selecting columns and filtering rows.)
 
 Write a few sentences to explain what is Apache Arrow. Imagine you want to explain it to a layman in an elevator. 
+
+```{r}
+#| eval: false  
+
+library(arrow)
+library(dplyr)
+
+# Step 1: Decompress the gzipped file
+file_path_gz <- "labevents.csv.gz"
+file_path_csv <- "labevents.csv"
+
+if (!file.exists(file_path_csv)) {
+  cat("\n=== Decompressing 'labevents.csv.gz' to 'labevents.csv' ===\n")
+  system(paste("gunzip -c", file_path_gz, ">", file_path_csv))  # Decompress
+}
+
+# Step 2: Measure ingestion + selection + filtering time
+cat("\n=== Using Apache Arrow for Efficient Data Processing ===\n")
+
+time_arrow <- system.time({
+  # Open dataset with Arrow
+  ds <- open_dataset(file_path_csv, format = "csv")
+
+  # Select columns and filter rows using dplyr
+  result <- ds %>%
+    select(subject_id, itemid, charttime, valuenum) %>%  # Select relevant columns
+    filter(itemid == 50868) %>%  # Filter for specific itemid (Example: Q2.3 condition)
+    collect()  # Convert to tibble for further use
+})
+
+# Step 3: Display results
+cat("\n=== Ingestion, Selection & Filtering Time ===\n")
+cat("Elapsed Time (seconds):", time_arrow["elapsed"], "\n")
+
+# Display the number of rows and first 10 rows
+cat("\nNumber of Rows After Filtering:", nrow(result), "\n")
+print(head(result, 10))  # Show first 10 rows
+
+```
+
 
 **(2.4) Solution ** 
 

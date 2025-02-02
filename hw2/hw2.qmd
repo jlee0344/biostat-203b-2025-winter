@@ -1,7 +1,7 @@
 ---
 title: "Biostat 203B Homework 2"
 subtitle: Due Feb 7, 2025 @ 11:59PM
-author: "Your Name and UID"
+author: "Julie Lee 806409381"
 format:
   html:
     theme: cosmo
@@ -56,60 +56,101 @@ ls -l ~/mimic/icu/
 There are quite a few utilities in R for reading plain text data files. Let us test the speed of reading a moderate sized compressed csv file, `admissions.csv.gz`, by three functions: `read.csv` in base R, `read_csv` in tidyverse, and `fread` in the data.table package.
 
 ```{r}
+# Define file path
 file_path <- "~/mimic/hosp/admissions.csv.gz"
 
-# Function to test reading speed, memory, and data types
-test_reading <- function(func, name) {
-  time <- system.time({
-    data <- func(file_path)
-  })
-  size <- object_size(data)
-  types <- sapply(data, class)
-  list(
-    Method = name,
-    Time = time["elapsed"],
-    Memory = format(size, units = "auto"),
-    DataTypes = paste(names(types), ":", types, collapse = ", ")
-  )
-}
+# Function 1: read.csv (Base R)
+time_base <- system.time(df_base <- read.csv(file_path, stringsAsFactors = TRUE))
+size_base <- object_size(df_base)
 
-# Perform tests
-results <- list(
-  test_reading(function(x) read.csv(x, stringsAsFactors = FALSE), "read.csv (base R)"),
-  test_reading(read_csv, "read_csv (tidyverse)"),
-  test_reading(fread, "fread (data.table)")
+# Function 2: read_csv (tidyverse)
+time_tidy <- system.time(df_tidy <- read_csv(file_path))
+size_tidy <- object_size(df_tidy)
+
+# Function 3: fread (data.table)
+time_dt <- system.time(df_dt <- fread(file_path))
+size_dt <- object_size(df_dt)
+
+
+results <- data.frame(
+  Method = c("Base R (read.csv)", "Tidyverse (read_csv)", "Data.table (fread)"),
+  UserTime = c(time_base["user.self"], time_tidy["user.self"], time_dt["user.self"]),
+  SystemTime = c(time_base["sys.self"], time_tidy["sys.self"], time_dt["sys.self"]),
+  ElapsedTime = c(time_base["elapsed"], time_tidy["elapsed"], time_dt["elapsed"]),
+  MemoryUsage = c(size_base, size_tidy, size_dt)
 )
-
-# Convert results to a data frame
-results_df <- do.call(rbind, lapply(results, as.data.frame))
-
-# Print the results table
-print(results_df, row.names = FALSE)
+print(results)
 ```
 
 Which function is fastest? Is there difference in the (default) parsed data types? How much memory does each resultant dataframe or tibble use? (Hint: `system.time` measures run times; `pryr::object_size` measures memory usage; all these readers can take gz file as input without explicit decompression.) 
 
 **(1.1 Solution) ** 
-The function that is the fastest in R for reading a plain text data file, more specifically reading the compressed csv file, 'admsissions.csv.gz', is the 'fread' function in the data.table package. 
+The fastest function in R for reading a plain text data file, specifically the compressed CSV file admissions.csv.gz, is the fread function from the data.table package. This conclusion is supported by its low values for both Elapsed Time and Usertime, highlighting its superior speed compared to other methods. Furthermore, fread is the most memory-efficient option, with the lowest Memory Usage. Based on a trial run, the memory usage for each method is as follows: Base R (read.csv) uses 200.10 MB, Tidyverse (read_csv) uses 70.02 MB, and data.table (fread) uses only 63.47 MB. These results clearly demonstrate that fread is the most efficient method for handling moderate to large CSV files in R. 
 
-The amount of memory that each resuldtant data frame or tibble uses 
+We investigate the difference in the (default) parsed data types: 
 
+The read.csv (Base R) by default, converts character columns into factors. 
+```{r}
+cat("Base R (read.csv):\n")
+str(df_base)
+```
 
+The read_csv Tidyverse function does not convert character columns to factors by default. 
+```{r}
+cat("\nTidyverse (read_csv):\n")
+str(df_tidy)
+```
+
+The fread (Data.Table) function automatically detects the approprotiates column types (numeric, character, etc) 
+```{r}
+cat("\nData.table (fread):\n")
+str(df_dt)             
+```
 
 ### Q1.2 User-supplied data types
 
 Re-ingest `admissions.csv.gz` by indicating appropriate column data types in `read_csv`. Does the run time change? How much memory does the result tibble use? (Hint: `col_types` argument in `read_csv`.)
 
 ```{r} 
+col_types <- cols(
+  subject_id = col_double(),
+  hadm_id = col_double(),
+  admittime = col_datetime(format = ""),
+  dischtime = col_datetime(format = ""),
+  deathtime = col_datetime(format = ""),
+  admission_type = col_character(),
+  admit_provider_id = col_character(),
+  admission_location = col_character(),
+  discharge_location = col_character(),
+  insurance = col_character(),
+  language = col_character(),
+  marital_status = col_character(),
+  race = col_character(),
+  edregtime = col_datetime(format = ""),
+  edouttime = col_datetime(format = ""),
+  hospital_expire_flag = col_double()
+)
 
+#Run Times 
+time_tidy_coltypes <- system.time(
+  df_tidy_coltypes <- read_csv(file_path, col_types = col_types)
+)
 
+#Memory Usage 
+size_tidy_coltypes <- object_size(df_tidy_coltypes)
+
+# Print runtime and memory usage
+cat("Runtime (Elapsed Time):\n")
+print(time_tidy_coltypes["elapsed"])
+
+cat("\nMemory usage (bytes):\n")
+print(size_tidy_coltypes)
 
 ```
 
 
 **(1.2) Solution ** 
 When we re-ingest admissions.csv.gz with specified column types, we are able to see that the file size remains 19M, the time taken to read the file is 2.413394 seconds, and the memory usage of the resulting tibble is 60.53 MB. 
-
 
 
 ## Q2. Ingest big data files
@@ -137,28 +178,41 @@ zcat < ~/mimic/hosp/labevents.csv.gz | head -10
 Try to ingest `labevents.csv.gz` using `read_csv`. What happens? If it takes more than 3 minutes on your computer, then abort the program and report your findings. 
 
 Using the read_csv function from the readr package. 
-
-```{r, eval = FALSE}
+```{r}
 file_path_labevents <- "~/mimic/hosp/labevents.csv.gz"
-#Using readr package to read the CSV file
-df <- read_csv(file_path)
+
+time_taken <- microbenchmark(
+  df <- read_csv(file_path_labevents),  
+  times = 1  
+)
+print(time_taken)
+head(df)
 ```
 
 **(2.1) Solution ** 
 
-Attempting to ingest 'labevents.csv.gz' using read_csv() (from the readr package) in R crashed due to my Mac’s 8GB RAM, which is insufficient for handling the 18.4GB decompressed file. Since R loads data entirely into memory, it requires approximately twice the file size (~36.8GB RAM), causing a memory overflow. To handle large files efficiently, alternatives include using chunked processing with read_csv(). This crash is expected because R primarily operates in-memory (RAM) rather than efficiently streaming large datasets. When using read_csv(), R attempts to load the entire dataset into RAM instead of processing it in chunks. If the available memory is insufficient, the system quickly runs out of resources, leading to an R session crash. This limitation makes handling large datasets challenging without proper memory management techniques.
+First attempt using R Server from Laptop: Attempting to ingest 'labevents.csv.gz' using read_csv() (from the readr package) in R crashed due to my Mac’s 8GB RAM, which is insufficient for handling the 18.4GB decompressed file. Since R loads data entirely into memory, it requires approximately twice the file size (~36.8GB RAM), causing a memory overflow. To handle large files efficiently, alternatives include using chunked processing with read_csv(). This crash is expected because R primarily operates in-memory (RAM) rather than efficiently streaming large datasets. When using read_csv(), R attempts to load the entire dataset into RAM instead of processing it in chunks. If the available memory is insufficient, the system quickly runs out of resources, leading to an R session crash. This limitation makes handling large datasets challenging without proper memory management techniques.
+
+Second attempt using the provided R Server: Attemping to ingest 'labevents.csv.gz' using read_csv() (from the readr package) in R did not crash and was able to showcase the first 6 rows of the file "labevents.csv.gz". 
 
 ### Q2.2 Ingest selected columns of `labevents.csv.gz` by `read_csv`
 
 Try to ingest only columns `subject_id`, `itemid`, `charttime`, and `valuenum` in `labevents.csv.gz` using `read_csv`.  Does this solve the ingestion issue? (Hint: `col_select` argument in `read_csv`.)
 
-```{r, eval = FALSE}
-df <- read_csv(file_path_labevents, col_select = c("subject_id", "itemid", "charttime", "valuenum"))
-head(df)
+```{r}
+# Measure ingestion time while selecting only the required columns
+time_taken <- microbenchmark(
+  df_only_columns <- read_csv(file_path_labevents, col_select = c("subject_id", "itemid", "charttime", "valuenum")),
+  times = 1
+)
+
+# Print time taken and preview first few rows
+print(time_taken)
+head(df_only_columns)
 ```
+
 **(2.2) Solution ** 
 By selecting only 4 columns (subject_id, itemid, charttime, and valuenum) 
-
 
 ### Q2.3 Ingest a subset of `labevents.csv.gz`
 
@@ -173,6 +227,65 @@ In later exercises, we will only be interested in the following lab items: creat
 Display the first 10 lines of the new file `labevents_filtered.csv.gz`. How many lines are in this new file, excluding the header? How long does it take `read_csv` to ingest `labevents_filtered.csv.gz`?
 
 **(2.3) Solution ** 
+
+```{bash}
+#| eval: false
+zcat ~/mimic/hosp/labevents.csv.gz | awk -F, '
+    BEGIN { OFS = "," }
+    NR == 1 || ($2 == 50912 || $2 == 50971 || $2 == 50983 || $2 == 50902 || $2 == 50882 || $2 == 51221 || $2 == 51301 || $2 == 50931) {
+        print $1, $2, $3, $4
+    }
+' | gzip > labevents_filtered.csv.gz
+```
+
+
+```{bash}
+#!/bin/bash
+
+# Define file paths
+INPUT_FILE=~/mimic/hosp/labevents.csv.gz
+OUTPUT_FILE=labevents_filtered.csv.gz
+
+# Start timing the extraction process
+START_TIME=$(date +%s)
+
+# Extract required columns and filter for specified itemid values
+zcat < "$INPUT_FILE" | awk -F',' '
+    BEGIN {OFS=",";}
+    NR==1 {
+        for (i=1; i<=NF; i++) col[$i] = i;
+        print "subject_id,itemid,charttime,valuenum";
+    }
+    NR>1 && ($col["itemid"] ~ /^(50912|50971|50983|50902|50882|51221|51301|50931)$/) {
+        print $col["subject_id"], $col["itemid"], $col["charttime"], $col["valuenum"];
+    }
+' | gzip > "$OUTPUT_FILE"
+
+# End timing the extraction process
+END_TIME=$(date +%s)
+echo "Time taken to filter and compress: $((END_TIME - START_TIME)) seconds"
+
+# Display first 10 lines of the new file
+echo "First 10 lines of the filtered file:"
+zcat < "$OUTPUT_FILE" | head -10
+
+# Count the number of lines excluding the header
+LINE_COUNT=$(zcat < "$OUTPUT_FILE" | wc -l)
+echo "Number of lines (excluding header): $((LINE_COUNT - 1))"
+
+# Start timing the read process
+READ_START_TIME=$(date +%s)
+
+# Measure read time by simply counting lines
+zcat < "$OUTPUT_FILE" | wc -l > /dev/null
+
+# End timing the read process
+READ_END_TIME=$(date +%s)
+echo "Time taken to read file: $((READ_END_TIME - READ_START_TIME)) seconds"
+
+```
+
+
 
 
 ### Q2.4 Ingest `labevents.csv` by Apache Arrow
@@ -223,12 +336,9 @@ DuckDB
 
 [`chartevents.csv.gz`](https://mimic.mit.edu/docs/iv/modules/icu/chartevents/) contains all the charted data available for a patient. During their ICU stay, the primary repository of a patient’s information is their electronic chart. The `itemid` variable indicates a single measurement type in the database. The `value` variable is the value measured for `itemid`. The first 10 lines of `chartevents.csv.gz` are
 
-
 ```{bash}
 zcat < ~/mimic/icu/chartevents.csv.gz | head -10
 ```
-
-
 How many rows? 433 millions.
 ```{bash}
 #| eval: false

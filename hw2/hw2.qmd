@@ -269,7 +269,6 @@ line_count=$(zcat "$file" | tail -n +2 | wc -l)
 echo "Number of lines in the file (excluding the header): $line_count"
 ```
 
-
 ```{bash}
 #l eval: false 
 
@@ -300,44 +299,47 @@ Then use [`arrow::open_dataset`](https://arrow.apache.org/docs/r/reference/open_
 Write a few sentences to explain what is Apache Arrow. Imagine you want to explain it to a layman in an elevator. 
 
 ```{bash}
-ls -l ~/mimic/hosp/
-#| eval: false
+#Decompress 'labevents.csv.gz' to 'labevents.csv': 
 
-#Decompressing to my Directory 
-gzip -dkf /home/jlee0344/mimic/hosp/labevents.csv.gz -c > ~/labevents.csv
+#l eval : false 
 
-```
-```{bash}
-ls -lh ~/mimic/hosp/labevents.csv
+gzip -d -c labevents_filtered.csv.gz > labevents.csv
+ls -l labevents.csv
 ```
 
+```{r}
+# Load necessary libraries
+library(arrow)
+library(dplyr)
 
-```{bash}
-# Measure the time for ingesting, selecting, and filtering
+# Start timing the process
 start_time <- Sys.time()
 
-# Open the dataset with Apache Arrow
-dataset <- open_dataset("labevents.csv", format = "csv")
+# Define the file path
+file_path <- "labevents.csv"
 
-# Select columns and filter rows based on itemid
+# Ingest the dataset using arrow::open_dataset
+dataset <- open_dataset(file_path, format = "csv")
+
+# Select relevant columns and filter rows based on itemid
 filtered_data <- dataset %>%
   select(subject_id, itemid, charttime, valuenum) %>%
   filter(itemid %in% c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931)) %>%
   collect()
 
+# End timing
 end_time <- Sys.time()
 
-# Calculate the time taken
+# Calculate time taken
 time_taken <- end_time - start_time
-cat(sprintf("Time taken for ingest + select + filter: %.2f seconds\n", as.numeric(time_taken)))
+cat("Time taken for ingest, select, and filter: ", round(time_taken, 4), "seconds\n")
 
-# Display the number of rows
-num_rows <- nrow(filtered_data)
-cat(sprintf("Number of rows in the filtered dataset: %d\n", num_rows))
+# Display number of rows in the result
+cat("Number of rows in the result: ", nrow(filtered_data), "\n")
 
-# Display the first 10 rows of the resulting tibble
+# Display the first 10 rows of the result tibble
+cat("First 10 rows of the result tibble:\n")
 print(head(filtered_data, 10))
-
 
 ```
 
@@ -372,7 +374,7 @@ Ingest the Parquet file, convert it to a DuckDB table by [`arrow::to_duckdb`](ht
 
 Write a few sentences to explain what is DuckDB. Imagine you want to explain it to a layman in an elevator.
 
-```{bash}
+```{r}
 
 ```
 

@@ -252,6 +252,8 @@ zcat ~/mimic/hosp/labevents.csv.gz |
   gzip > labevents_filtered.csv.gz
 ```
 
+The first 10 lines (excluding the header) of the new file 'labevents_filtered.csv.gz' is presented below: 
+
 ```{bash}
 #l eval: false 
 
@@ -259,7 +261,7 @@ zcat ~/mimic/hosp/labevents.csv.gz |
 
 file="labevents_filtered.csv.gz"
 echo "First 10 lines of the file (including the header):"
-zcat "$file" | head -n 10
+zcat "$file" | head -n 11
 ```
 
 ```{bash}
@@ -299,54 +301,41 @@ Then use [`arrow::open_dataset`](https://arrow.apache.org/docs/r/reference/open_
 Write a few sentences to explain what is Apache Arrow. Imagine you want to explain it to a layman in an elevator. 
 
 ```{bash}
-#Decompress 'labevents.csv.gz' to 'labevents.csv': 
-
 #l eval : false 
-
 gzip -d -c labevents_filtered.csv.gz > labevents.csv
-ls -l labevents.csv
 ```
 
 ```{r}
-# Load necessary libraries
-library(arrow)
-library(dplyr)
-
-# Start timing the process
 start_time <- Sys.time()
-
-# Define the file path
 file_path <- "labevents.csv"
-
-# Ingest the dataset using arrow::open_dataset
 dataset <- open_dataset(file_path, format = "csv")
 
-# Select relevant columns and filter rows based on itemid
-filtered_data <- dataset %>%
+#Filter out specific values in item_id 
+filtered_data_apache <- dataset %>%
   select(subject_id, itemid, charttime, valuenum) %>%
   filter(itemid %in% c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931)) %>%
   collect()
 
-# End timing
 end_time <- Sys.time()
 
-# Calculate time taken
 time_taken <- end_time - start_time
 cat("Time taken for ingest, select, and filter: ", round(time_taken, 4), "seconds\n")
 
-# Display number of rows in the result
-cat("Number of rows in the result: ", nrow(filtered_data), "\n")
+cat("Number of rows in the result: ", nrow(filtered_data_apache), "\n")
+```
 
-# Display the first 10 rows of the result tibble
-cat("First 10 rows of the result tibble:\n")
-print(head(filtered_data, 10))
+The first 10 rows of the resulting tibble are: 
 
+```{r}
+print(head(filtered_data_apache, 10))
 ```
 
 
 **(2.4) Solution ** 
 
-Apache Arrow is the 
+The time that it takes to ingest, select, and filter out for specific item_id (creatinine (50912), potassium (50971), sodium (50983), chloride (50902), bicarbonate (50882), hematocrit (51221), white blood cell count (51301), and glucose (50931)) to create the resulting tibble takes 8.6242 seconds. The number of rows of the result tibble is 32651024 rows. The resulting tibble does match the one from question 2.3, confirming the validity of ingesting labevents.csv by Apache Arrow. 
+
+Apache Arrow is a technology that helps software developers create powerful applications to work with large amounts of data quickly and efficiently. It provides a special way to organize and store data in a format that works well across different programming languages. This format is designed to handle both simple data (like lists or tables) and more complex structures, making it easier to analyze data on modern hardware, such as CPUs and GPUs. The way Apache Arrow structures data (utilizes a standardized columnar format) allows for much faster processing and analysis because it takes advantage of how modern hardware works. This means tasks like running queries or performing analytics can be done more quickly and with better use of the computer's resources.
 
 
 ### Q2.5 Compress `labevents.csv` to Parquet format and ingest/select/filter
@@ -360,6 +349,9 @@ Re-write the csv file `labevents.csv` in the binary Parquet format (Hint: [`arro
 Write a few sentences to explain what is the Parquet format. Imagine you want to explain it to a layman in an elevator.
 
 ```{bash}
+file = 'labevents.csv' 
+
+
 
 ```
 
@@ -371,6 +363,7 @@ Write a few sentences to explain what is the Parquet format. Imagine you want to
 </p>
 
 Ingest the Parquet file, convert it to a DuckDB table by [`arrow::to_duckdb`](https://arrow.apache.org/docs/r/reference/to_duckdb.html), select columns, and filter rows as in Q2.5. How long does the ingest+convert+select+filter process take? Display the number of rows and the first 10 rows of the result tibble and make sure they match those in Q2.3. (Hint: use `dplyr` verbs for selecting columns and filtering rows.)
+
 
 Write a few sentences to explain what is DuckDB. Imagine you want to explain it to a layman in an elevator.
 

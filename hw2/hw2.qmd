@@ -349,9 +349,37 @@ Re-write the csv file `labevents.csv` in the binary Parquet format (Hint: [`arro
 Write a few sentences to explain what is the Parquet format. Imagine you want to explain it to a layman in an elevator.
 
 ```{bash}
-file = 'labevents.csv' 
+# 1. Convert CSV to Parquet
+csv_file <- "labevents.csv"
+parquet_dir <- "labevents_parquet"  # Directory to save Parquet files
 
+# Start timing conversion
+start_time_conversion <- Sys.time()
+write_dataset(read_csv_arrow(csv_file), parquet_dir, format = "parquet")
+end_time_conversion <- Sys.time()
 
+cat("Time taken to convert CSV to Parquet:", round(difftime(end_time_conversion, start_time_conversion, units = "secs"), 4), "seconds\n")
+
+# 2. Measure the size of the Parquet file(s)
+parquet_size <- sum(file.info(list.files(parquet_dir, recursive = TRUE, full.names = TRUE))$size) / (1024^2)  # Convert to MB
+cat("Total size of Parquet file(s):", round(parquet_size, 2), "MB\n")
+
+# 3. Ingest, select, and filter the Parquet file(s)
+start_time <- Sys.time()
+dataset <- open_dataset(parquet_dir, format = "parquet")
+
+filtered_data <- dataset %>%
+  select(subject_id, itemid, charttime, valuenum) %>%
+  filter(itemid %in% c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931)) %>%
+  collect()
+end_time <- Sys.time()
+
+cat("Time taken to ingest, select, and filter Parquet file(s):", round(difftime(end_time, start_time, units = "secs"), 4), "seconds\n")
+
+# Display number of rows and first 10 rows
+cat("Number of rows in the filtered data:", nrow(filtered_data), "\n")
+cat("First 10 rows of the filtered data:\n")
+print(head(filtered_data, 10))
 
 ```
 
@@ -405,12 +433,11 @@ zcat ~/mimic/icu/chartevents.csv.gz |
 awk -F, 'BEGIN {
     OFS=","; 
     # Print the header row
-    print "subject_id", "hadm_id", "stay_id", "caregiver_id", "charttime", "storetime", "itemid", "value", "valuenum", "valueuom", "warning"
+    print "subject_id", "itemid" ,"charttime","valuenum"
 }
 NR==1 {next}  # Skip the header row of the original file
 $7 ~ /^[0-9]+$/ && ($7 == 220045 || $7 == 220181 || $7 == 220179 || $7 == 223761 || $7 == 220210) {
-    # Print relevant columns: subject_id, hadm_id, stay_id, caregiver_id, charttime, storetime, itemid, value, valuenum, valueuom, warning
-    print $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+    print $1, $5, $7, $9
 }' | gzip > chartevents_filtered.csv.gz
 ```
 

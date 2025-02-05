@@ -56,36 +56,47 @@ ls -l ~/mimic/icu/
 There are quite a few utilities in R for reading plain text data files. Let us test the speed of reading a moderate sized compressed csv file, `admissions.csv.gz`, by three functions: `read.csv` in base R, `read_csv` in tidyverse, and `fread` in the data.table package.
 
 ```{r}
-# Define file path
 file_path <- "~/mimic/hosp/admissions.csv.gz"
 
-# Function 1: read.csv (Base R)
-time_base <- system.time(df_base <- read.csv(file_path, stringsAsFactors = TRUE))
+# Function 1: Using read.csv (Base R)
+time_base <- system.time(
+  df_base <- read.csv(file_path, stringsAsFactors = TRUE)
+)
 size_base <- object_size(df_base)
 
-# Function 2: read_csv (tidyverse)
-time_tidy <- system.time(df_tidy <- read_csv(file_path))
+# Function 2: Using read_csv (tidyverse)
+time_tidy <- system.time(
+  df_tidy <- read_csv(file_path)
+)
 size_tidy <- object_size(df_tidy)
 
-# Function 3: fread (data.table)
-time_dt <- system.time(df_dt <- fread(file_path))
+# Function 3: Using fread (data.table)
+time_dt <- system.time(
+  df_dt <- fread(file_path)
+)
 size_dt <- object_size(df_dt)
 
-
+# Combine results into a data frame
 results <- data.frame(
-  Method = c("Base R (read.csv)", "Tidyverse (read_csv)", "Data.table (fread)"),
-  UserTime = c(time_base["user.self"], time_tidy["user.self"], time_dt["user.self"]),
-  SystemTime = c(time_base["sys.self"], time_tidy["sys.self"], time_dt["sys.self"]),
-  ElapsedTime = c(time_base["elapsed"], time_tidy["elapsed"], time_dt["elapsed"]),
+  Method = c("Base R (read.csv)", "Tidyverse (read_csv)",
+             "Data.table (fread)"),
+  UserTime = c(time_base["user.self"], time_tidy["user.self"],
+               time_dt["user.self"]),
+  SystemTime = c(time_base["sys.self"], time_tidy["sys.self"],
+                 time_dt["sys.self"]),
+  ElapsedTime = c(time_base["elapsed"], time_tidy["elapsed"],
+                  time_dt["elapsed"]),
   MemoryUsage = c(size_base, size_tidy, size_dt)
 )
+
+# Print the results
 print(results)
+
 ```
 
 Which function is fastest? Is there difference in the (default) parsed data types? How much memory does each resultant dataframe or tibble use? (Hint: `system.time` measures run times; `pryr::object_size` measures memory usage; all these readers can take gz file as input without explicit decompression.) 
-
 **(1.1 Solution) ** 
-The fastest function in R for reading a plain text data file, specifically the compressed CSV file admissions.csv.gz, is the fread function from the data.table package. This conclusion is supported by its low values for both Elapsed Time and Usertime, highlighting its superior speed compared to other methods. Furthermore, fread is the most memory-efficient option, with the lowest Memory Usage. Based on a trial run, the memory usage for each method is as follows: Base R (read.csv) uses 200.10 MB, Tidyverse (read_csv) uses 70.02 MB, and data.table (fread) uses only 63.47 MB. These results clearly demonstrate that fread is the most efficient method for handling moderate to large CSV files in R. 
+The fastest function in R for reading a plain text data file, specifically the compressed CSV file admissions.csv.gz, is the fread function from the data.table package. This conclusion is supported by its low values for SystemTime, ElapsedTime, and Usertime, highlighting its superior speed compared to other methods. Furthermore, fread is the most memory-efficient option, with the lowest Memory Usage. Based on a trial run, the memory usage for each method is as follows: Base R (read.csv) uses 200.10 MB, Tidyverse (read_csv) uses 70.02 MB, and data.table (fread) uses only 63.47 MB. These results clearly demonstrate that fread is the most efficient method for handling moderate to large CSV files in R. 
 
 We investigate the difference in the (default) parsed data types: 
 
@@ -96,7 +107,7 @@ cat("Base R (read.csv):\n")
 str(df_base)
 ```
 
-The read_csv Tidyverse function does not convert character columns to factors by default. We notice that the variables subject_id, hadm_id, and hospital_expire_flag are set to numbers. The variables admittime, dischtime,  deathtime, edregtime, and edouttime are set to numbers, and all other variables are set to characters. 
+The read_csv Tidyverse function does not convert character columns to factors by default. We notice that the variables subject_id, hadm_id, and hospital_expire_flag are set to numbers. The variables admittime, dischtime, deathtime, edregtime, and edouttime are set to POSIXct, and all other variables are set to characters. 
 
 ```{r}
 cat("\nTidyverse (read_csv):\n")
@@ -117,9 +128,12 @@ Re-ingest `admissions.csv.gz` by indicating appropriate column data types in `re
 ```{r} 
 file_path <- "~/mimic/hosp/admissions.csv.gz"
 
-time_tidy_default <- system.time(df_tidy_default <- read_csv(file_path))
+time_tidy_default <- system.time(
+  df_tidy_default <- read_csv(file_path)
+)
 size_tidy_default <- object_size(df_tidy_default)
 
+# Define column types for read_csv
 col_types <- cols(
   subject_id = col_double(),
   hadm_id = col_double(),
@@ -145,8 +159,10 @@ time_tidy_optimized <- system.time(
 size_tidy_optimized <- object_size(df_tidy_optimized)
 
 results <- data.frame(
-  Method = c("read_csv (Default)", "read_csv (Appropriate Column Data Types)"),
-  ElapsedTime = c(time_tidy_default["elapsed"], time_tidy_optimized["elapsed"]),
+  Method = c("read_csv (Default)", 
+             "read_csv (Appropriate Column Data Types)"),
+  ElapsedTime = c(time_tidy_default["elapsed"], 
+                  time_tidy_optimized["elapsed"]),
   MemoryUsage = c(size_tidy_default, size_tidy_optimized)
 )
 
@@ -183,7 +199,7 @@ Try to ingest `labevents.csv.gz` using `read_csv`. What happens? If it takes mor
 
 Using the read_csv function from the readr package. 
 
-```{r}
+```{r, eval = FALSE}
 file_path_labevents <- "~/mimic/hosp/labevents.csv.gz"
 cat("\n=== Ingesting 'labevents.csv.gz' using read_csv() ===\n")
 
@@ -197,7 +213,6 @@ cat("\n=== Ingestion Performance Metrics ===\n")
 cat("Elapsed Time (seconds):", time_full["elapsed"], "\n")
 cat("Memory Usage (MB):", size_full / (1024^2), "\n")
 print(head(df_full))
-
 ```
 
 **(2.1) Solution ** 
@@ -240,7 +255,6 @@ Display the first 10 lines of the new file `labevents_filtered.csv.gz`. How many
 
 ```{bash}
 #l eval: false
-
 zcat ~/mimic/hosp/labevents.csv.gz |
   awk -F, 'BEGIN {OFS=","; print "subject_id,itemid,charttime,valuenum"}
   NR==1 {next}
@@ -348,12 +362,10 @@ Re-write the csv file `labevents.csv` in the binary Parquet format (Hint: [`arro
 
 Write a few sentences to explain what is the Parquet format. Imagine you want to explain it to a layman in an elevator.
 
-```{bash}
-# 1. Convert CSV to Parquet
+```{r}
 csv_file <- "labevents.csv"
 parquet_dir <- "labevents_parquet"  # Directory to save Parquet files
 
-# Start timing conversion
 start_time_conversion <- Sys.time()
 write_dataset(read_csv_arrow(csv_file), parquet_dir, format = "parquet")
 end_time_conversion <- Sys.time()
@@ -364,13 +376,13 @@ cat("Time taken to convert CSV to Parquet:", round(difftime(end_time_conversion,
 parquet_size <- sum(file.info(list.files(parquet_dir, recursive = TRUE, full.names = TRUE))$size) / (1024^2)  # Convert to MB
 cat("Total size of Parquet file(s):", round(parquet_size, 2), "MB\n")
 
-# 3. Ingest, select, and filter the Parquet file(s)
 start_time <- Sys.time()
 dataset <- open_dataset(parquet_dir, format = "parquet")
 
 filtered_data <- dataset %>%
   select(subject_id, itemid, charttime, valuenum) %>%
   filter(itemid %in% c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931)) %>%
+  arrange(subject_id, itemid, charttime, valuenum) %>%  
   collect()
 end_time <- Sys.time()
 
@@ -378,11 +390,16 @@ cat("Time taken to ingest, select, and filter Parquet file(s):", round(difftime(
 
 # Display number of rows and first 10 rows
 cat("Number of rows in the filtered data:", nrow(filtered_data), "\n")
-cat("First 10 rows of the filtered data:\n")
+
 print(head(filtered_data, 10))
 
 ```
 
+**(2.5 Solution) ** 
+The time it takes to convert the CSV file to Parquet is 16.6681 seconds. 
+The total size of Parquet files is 127.15 MB. 
+The time it takes to ingest, select, and filter Parquet files is 0.3625 seconds 
+The number of rows in the filtered dataset is 32651024 rows. 
 
 ### Q2.6 DuckDB
 
@@ -396,12 +413,40 @@ Ingest the Parquet file, convert it to a DuckDB table by [`arrow::to_duckdb`](ht
 Write a few sentences to explain what is DuckDB. Imagine you want to explain it to a layman in an elevator.
 
 ```{r}
+parquet_file <- "labevents_parquet"  
+
+start_time <- Sys.time()
+
+arrow_data <- open_dataset(parquet_file, format = "parquet")
+
+duckdb_conn <- dbConnect(duckdb::duckdb())
+
+invisible(to_duckdb(
+  .data = arrow_data,
+  con = duckdb_conn,
+  table_name = "labevents",
+  auto_disconnect = FALSE
+))  
+
+result <- tbl(duckdb_conn, "labevents") %>%
+  select(subject_id, itemid, charttime, valuenum) %>%
+  filter(itemid %in% c(50912, 50971, 50983, 50902, 
+                       50882, 51221, 51301, 50931)) %>%
+  arrange(subject_id, itemid, charttime, valuenum) %>% 
+  collect()
+
+end_time <- Sys.time()
+
+elapsed_time <- end_time - start_time
+cat("Ingest, convert, select, and filter time:", 
+    round(elapsed_time, 4), "seconds\n")
+
+cat("Number of rows in the result:", nrow(result), "\n")
+print(head(result, 10)) 
+
+dbDisconnect(duckdb_conn)
 
 ```
-
-DuckDB 
-
-
 ## Q3. Ingest and filter `chartevents.csv.gz`
 
 [`chartevents.csv.gz`](https://mimic.mit.edu/docs/iv/modules/icu/chartevents/) contains all the charted data available for a patient. During their ICU stay, the primary repository of a patient’s information is their electronic chart. The `itemid` variable indicates a single measurement type in the database. The `value` variable is the value measured for `itemid`. The first 10 lines of `chartevents.csv.gz` are
@@ -428,8 +473,7 @@ Document the steps and show code. Display the number of rows and the first 10 ro
 
 ```{bash}
 #| eval: false
-
-zcat ~/mimic/icu/chartevents.csv.gz | 
+zcat ~/mimic/icu/chartevents.csv.gz |  
 awk -F, 'BEGIN {
     OFS=","; 
     # Print the header row
@@ -454,7 +498,9 @@ zcat chartevents_filtered.csv.gz | head -n 10
 ```
 
 **(3.1) Solution ** 
-The following the 
+
+We choose the same 4 columns from the previous problem: 'subject_id', 'itemid', 'charttime', and 'valuenum'. In addition, we filter out specific 
+
 subject_id,hadm_id,stay_id,caregiver_id,charttime,storetime,itemid,value,valuenum,valueuom,warning
 
 
@@ -464,12 +510,9 @@ vitals for ICU patients: heart rate (220045), mean non-invasive blood pressure (
 
 
 
+[`chartevents.csv.gz`](https://mimic.mit.edu/docs/iv/modules/icu/chartevents/) contains all the charted data available for a patient. During their ICU stay, the primary repository of a patient’s information is their electronic chart. The `itemid` variable indicates a single measurement type in the database. The `value` variable is the value measured for `itemid`. The first 10 lines of `chartevents.csv.gz` are
 
 
+In later exercises, we are interested in the vitals for ICU patients: heart rate (220045), mean non-invasive blood pressure (220181), systolic non-invasive blood pressure (220179), body temperature in Fahrenheit (223761), and respiratory rate (220210). Retrieve a subset of `chartevents.csv.gz` only containing these items, using the favorite method you learnt in Q2. 
 
-
-
-
-
-
-
+Document the steps and show code. Display the number of rows and the first 10 rows of the result tibble.

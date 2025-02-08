@@ -217,16 +217,17 @@ The second attempt using the provided R Server successfully ingested 'labevents.
 
 Try to ingest only columns `subject_id`, `itemid`, `charttime`, and `valuenum` in `labevents.csv.gz` using `read_csv`.  Does this solve the ingestion issue? (Hint: `col_select` argument in `read_csv`.)
 
-```{r, eval = FALSE}
+```{r}
+file_path_labevents <- "~/mimic/hosp/labevents.csv.gz"
 time_selected <- system.time(
   df_selected <- read_csv(
     file_path_labevents, 
     col_select = c("subject_id", "itemid", "charttime", "valuenum")
   ) %>%
-  arrange(subject_id, itemid, charttime, valuenum)  
+  arrange(subject_id, charttime, itemid)  
 )
-size_selected <- object_size(df_selected)
 
+size_selected <- object_size(df_selected)
 cat("Elapsed Time (seconds):", time_selected["elapsed"], "\n")
 cat("Memory Usage (bytes):", size_selected, "\n")
 head(df_selected)
@@ -322,7 +323,7 @@ dataset <- open_dataset(file_path, format = "csv")
 # Filter out specific values in item_id
 filtered_data_apache <- dataset %>%
   select(subject_id, itemid, charttime, valuenum) %>%
-  arrange(subject_id, itemid, charttime, valuenum) %>%
+  arrange(subject_id, charttime, itemid) %>%
   filter(itemid %in% c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 
                        50931)) %>%
   collect()
@@ -388,7 +389,7 @@ filtered_data <- dataset %>%
   filter(itemid %in% c(
     50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931
   )) %>%
-  arrange(subject_id, itemid, charttime, valuenum) %>%
+  arrange(subject_id, charttime, itemid) %>%
   collect()
 end_time <- Sys.time()
 
@@ -433,7 +434,7 @@ result <- tbl(duckdb_conn, "labevents") %>%
   select(subject_id, itemid, charttime, valuenum) %>%
   filter(itemid %in% c(50912, 50971, 50983, 50902, 
                        50882, 51221, 51301, 50931)) %>%
-  arrange(subject_id, itemid, charttime, valuenum) %>% 
+  arrange(subject_id, charttime, itemid,) %>% 
   collect()
 
 end_time <- Sys.time()
@@ -447,6 +448,7 @@ print(head(result, 10))
 
 dbDisconnect(duckdb_conn)
 ```
+
 **(Solution 2.6) **
 After running the code above, we were able to obtain the following information regarding the Parquet file that was converted to a DuckDB tab: The process to ingest, select, and filter is 4.0037 seconds. The number of rows in the filtered dataset is 32651024 rows. DuckDB is an open-source, column-oriented database designed for fast and efficient data analysis. It handles complex queries on large datasets, such as combining tables with hundreds of columns and billions of rows, all within an embedded setup. DuckDB is efficient for tasks such as analyzing log files, personal data on edge devices, and preparing data for machine learning, especially when privacy is important. It can read files directly (like Parquet or CSV), uses SQL to quickly find insights, and is lightweight and fast. Side Note: The tibble matches the ones from questions 2.4 and 2.5. 
 
@@ -486,7 +488,7 @@ NR == 1 {next}
 $7 ~ /^[0-9]+$/ && 
 ($7 == 220045 || $7 == 220181 || $7 == 220179 || 
  $7 == 223761 || $7 == 220210) {
-    print $1, $5, $7, $9
+    print $1, $7, $5, $9
 }' | gzip > chartevents_filtered.csv.gz
 ```
 
@@ -504,7 +506,7 @@ file="chartevents_filtered.csv.gz"
 echo "First 10 lines of the file (including the header):"
 (
   zcat "$file" | head -n 1
-  zcat "$file" | tail -n +2 | sort -t, -k1,1n -k3,3 -k2,2n | head -n 10
+  zcat "$file" | tail -n +2 | sort -t, -k1,1n -k3,3 -k2,2n  | head -n 10
 ) 2>/dev/null
 
 ```
@@ -512,4 +514,4 @@ echo "First 10 lines of the file (including the header):"
 **(3.1) Solution ** 
 We selected the same four columns from the previous problem: subject_id, itemid, charttime, and valuenum, which are essential for analyzing ICU patient data. To focus on specific vitals, we filtered rows corresponding to key itemid values: heart rate (220045), mean non-invasive blood pressure (220181), systolic non-invasive blood pressure (220179), body temperature in Fahrenheit (223761), and respiratory rate (220210). To handle the large file located at ~/mimic/icu/chartevents.csv.gz, we used the first strategy (from question 2.2) to create a filtered and compressed subset of the data. This involved using the bash command to first decompress the file with zcat, stream its content into awk for filtering and extracting the relevant columns, and finally compress the output with gzip, resulting in a new file named chartevents_filtered.csv.gz in the current working directory. This method efficiently processed the large dataset, reducing its size while retaining only the relevant rows and columns, producing a streamlined and compressed dataset ready for further analysis.
 
-The number of rows (excluding the header row) in the filtered data (subset) is 30195426 rows. 
+The number of rows (excluding the header row) in the filtered data (subset) is 30195426 rows..

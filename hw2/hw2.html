@@ -3291,7 +3291,7 @@ Attaching package: &#39;R.utils&#39;</code></pre>
 <div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>memuse<span class="sc">::</span><span class="fu">Sys.meminfo</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Totalram:  62.792 GiB 
-Freeram:   42.748 GiB </code></pre>
+Freeram:   43.417 GiB </code></pre>
 </div>
 </div>
 <p>In this exercise, we explore various tools for ingesting the <a href="https://physionet.org/content/mimiciv/3.1/">MIMIC-IV</a> data introduced in <a href="https://ucla-biostat-203b.github.io/2025winter/hw/hw1/hw1.html">homework 1</a>.</p>
@@ -3395,9 +3395,9 @@ dttm (5): admittime, dischtime, deathtime, edregtime, edouttime
 <span id="cb37-21"><a href="#cb37-21" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(results)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>                Method UserTime SystemTime ElapsedTime MemoryUsage
-1    Base R (read.csv)   25.885      0.270      26.158   186.29 MB
-2 Tidyverse (read_csv)    1.903      0.319       1.004    70.02 MB
-3   Data.table (fread)    1.956      0.120       0.788    63.47 MB</code></pre>
+1    Base R (read.csv)   25.671      0.278      25.950   186.29 MB
+2 Tidyverse (read_csv)    1.997      0.327       1.158    70.02 MB
+3   Data.table (fread)    2.089      0.126       0.803    63.47 MB</code></pre>
 </div>
 </div>
 <p>Which function is fastest? Is there difference in the (default) parsed data types? How much memory does each resultant dataframe or tibble use? (Hint: <code>system.time</code> measures run times; <code>pryr::object_size</code> measures memory usage; all these readers can take gz file as input without explicit decompression.)</p>
@@ -3565,8 +3565,8 @@ dttm (5): admittime, dischtime, deathtime, edregtime, edouttime
 <span id="cb53-35"><a href="#cb53-35" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(results)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>                                    Method ElapsedTime MemoryUsage
-1                       read_csv (Default)       1.118    70.02 MB
-2 read_csv (Appropriate Column Data Types)       0.882    70.02 MB</code></pre>
+1                       read_csv (Default)       1.243    70.02 MB
+2 read_csv (Appropriate Column Data Types)       1.036    70.02 MB</code></pre>
 </div>
 </div>
 <p><strong>(1.2) Solution </strong> When we re-ingest admissions.csv.gz with specified column types, we observe that the memory usage remains unchanged at 70.02 MB, consistent with the default ingestion. However, specifying column types leads to a noticeable improvement in performance, reducing the elapsed time from 1.371 seconds to 1.010 seconds. This demonstrates that while explicitly defining column types does not impact memory consumption, it optimizes parsing speed, making the data loading process more efficient. Thus, for large datasets, pre-defining column types can be beneficial in enhancing performance.</p>
@@ -3648,7 +3648,7 @@ dttm (1): charttime
 <div class="sourceCode cell-code" id="cb62"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a>size_selected <span class="ot">&lt;-</span> <span class="fu">object_size</span>(df_selected)</span>
 <span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Elapsed Time (seconds):&quot;</span>, time_selected[<span class="st">&quot;elapsed&quot;</span>], <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Elapsed Time (seconds): 143.326 </code></pre>
+<pre><code>Elapsed Time (seconds): 184.915 </code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb64"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Memory Usage (bytes):&quot;</span>, size_selected, <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -3735,7 +3735,7 @@ subject_id,itemid,charttime,valuenum
 <div class="cell-output cell-output-stdout">
 <pre><code>
 Measuring read time in R...
-[1] &quot;Time taken to ingest the file using read.csv(): 51.1691 seconds&quot;</code></pre>
+[1] &quot;Time taken to ingest the file using read.csv(): 51.0069 seconds&quot;</code></pre>
 </div>
 </div>
 <p><strong>(2.3) Solution </strong> After manually checking the specific columns that correspond to “subject_id”, “itemid”, “charttime”, and “valuenum” and filtering out rows that only have lab items creatinine (50912), potassium (50971), sodium (50983), chloride (50902), bicarbonate (50882), hematocrit (51221), white blood cell count (51301), and glucose (50931), we created the labevents_filtered.csv.gz. The number of lines in the new file (labevents_filtered.csv.gz) excluding the header is 32651024 lines. The time it takes to ingest the <code>labevents_filtered.csv.gz</code> file using the function read_csv is 51.0504 seconds.</p>
@@ -3771,7 +3771,7 @@ Measuring read time in R...
 <span id="cb76-16"><a href="#cb76-16" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Time taken for ingest, select, and filter: &quot;</span>, <span class="fu">round</span>(time_taken, <span class="dv">4</span>), </span>
 <span id="cb76-17"><a href="#cb76-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;seconds</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Time taken for ingest, select, and filter:  8.1434 seconds</code></pre>
+<pre><code>Time taken for ingest, select, and filter:  7.9102 seconds</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb78"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Number of rows in the result: &quot;</span>, <span class="fu">nrow</span>(filtered_data_apache), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -3824,7 +3824,7 @@ Measuring read time in R...
 <span id="cb82-13"><a href="#cb82-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;seconds</span><span class="sc">\n</span><span class="st">&quot;</span></span>
 <span id="cb82-14"><a href="#cb82-14" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Time taken to convert CSV to Parquet: 3.7691 seconds</code></pre>
+<pre><code>Time taken to convert CSV to Parquet: 3.7919 seconds</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb84"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a>parquet_size <span class="ot">&lt;-</span> <span class="fu">sum</span>(</span>
 <span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.info</span>(<span class="fu">list.files</span>(parquet_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">full.names =</span> <span class="cn">TRUE</span>))<span class="sc">$</span>size</span>
@@ -3851,7 +3851,7 @@ Measuring read time in R...
 <span id="cb86-16"><a href="#cb86-16" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;seconds</span><span class="sc">\n</span><span class="st">&quot;</span></span>
 <span id="cb86-17"><a href="#cb86-17" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Time taken to ingest, select, and filter Parquet file(s): 4.2161 seconds</code></pre>
+<pre><code>Time taken to ingest, select, and filter Parquet file(s): 4.1882 seconds</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb88"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb88-1"><a href="#cb88-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Number of rows in the filtered data:&quot;</span>, <span class="fu">nrow</span>(filtered_data), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -3909,7 +3909,7 @@ Measuring read time in R...
 <span id="cb92-23"><a href="#cb92-23" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Ingest, convert, select, and filter time:&quot;</span>, </span>
 <span id="cb92-24"><a href="#cb92-24" aria-hidden="true" tabindex="-1"></a>    <span class="fu">round</span>(elapsed_time, <span class="dv">4</span>), <span class="st">&quot;seconds</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Ingest, convert, select, and filter time: 5.3411 seconds</code></pre>
+<pre><code>Ingest, convert, select, and filter time: 5.1738 seconds</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb94"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb94-1"><a href="#cb94-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Number of rows in the result:&quot;</span>, <span class="fu">nrow</span>(result), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -4022,7 +4022,6 @@ subject_id,itemid,charttime,valuenum
 </div>
 </div>
 <p><strong>(3.1) Solution </strong> We selected the same four columns from the previous problem: subject_id, itemid, charttime, and valuenum, which are essential for analyzing ICU patient data. To focus on specific vitals, we filtered rows corresponding to key itemid values: heart rate (220045), mean non-invasive blood pressure (220181), systolic non-invasive blood pressure (220179), body temperature in Fahrenheit (223761), and respiratory rate (220210). To handle the large file located at ~/mimic/icu/chartevents.csv.gz, we used the first strategy (from question 2.2) to create a filtered and compressed subset of the data. This involved using the bash command to first decompress the file with zcat, stream its content into awk for filtering and extracting the relevant columns, and finally compress the output with gzip, resulting in a new file named chartevents_filtered.csv.gz in the current working directory. This method efficiently processed the large dataset, reducing its size while retaining only the relevant rows and columns, producing a streamlined and compressed dataset ready for further analysis.</p>
-<p>The number of rows (excluding the header row) in the filtered data (subset) is 30195426 rows..</p>
 </section>
 
 </main>

@@ -48,21 +48,168 @@ Do a similar visualization for the patient with `subject_id` 10063848 using ggpl
 
 Hint: We need to pull information from data files `patients.csv.gz`, `admissions.csv.gz`, `transfers.csv.gz`, `labevents.csv.gz`, `procedures_icd.csv.gz`, `diagnoses_icd.csv.gz`, `d_icd_procedures.csv.gz`, and `d_icd_diagnoses.csv.gz`. For the big file `labevents.csv.gz`, use the Parquet format you generated in Homework 2. For reproducibility, make the Parquet folder `labevents_pq` available at the current working directory `hw3`, for example, by a symbolic link. Make your code reproducible.
 
-```{r}
-
+```{bash}
+ln -s ~/biostat-203b-2025-winter/hw2/labevents_parquet ./labevents_pq
+ls -l ./labevents_pq
 ```
 
 
-### Q1.2 ICU stays
-
-ICU stays are a subset of ADT history. This figure shows the vitals of the patient `10001217` during ICU stays. The x-axis is the calendar time, and the y-axis is the value of the vital. The color of the line represents the type of vital. The facet grid shows the abbreviation of the vital and the stay ID.
-
-![](10001217_icu.png)
-
-Do a similar visualization for the patient `10063848`.
 
 ```{r}
+patients <- read_csv("~/mimic/hosp/patients.csv.gz")
+admissions <- read_csv("~/mimic/hosp/admissions.csv.gz")
+transfers <- read_csv("~/mimic/hosp/transfers.csv.gz")
+procedures <- read_csv("~/mimic/hosp/procedures_icd.csv.gz")
+diagnoses <- read_csv("~/mimic/hosp/diagnoses_icd.csv.gz")
+d_icd_procedures <- read_csv("~/mimic/hosp/d_icd_procedures.csv.gz")
+d_icd_diagnoses <- read_csv("~/mimic/hosp/d_icd_diagnoses.csv.gz")
+icustays <- read_csv("~/mimic/icu/icustays.csv.gz")
+d_items <- read_csv("~/mimic/icu/d_items.csv.gz")
+labevents <- read_parquet("./labevents_pq/part-0.parquet")
 ```
+
+
+
+```{r}
+# Set subject ID
+subject_id <- 10001217
+
+# Load patient-specific data
+patient_info <- patients %>% filter(subject_id == !!subject_id)
+admissions_info <- admissions %>% filter(subject_id == !!subject_id)
+transfers_info <- transfers %>% filter(subject_id == !!subject_id)
+labevents_info <- labevents %>% filter(subject_id == !!subject_id)
+procedures_info <- procedures %>% filter(subject_id == !!subject_id)
+diagnoses_info <- diagnoses %>% filter(subject_id == !!subject_id)
+```
+
+
+```{r}
+# Ensure ICD codes have a consistent format
+diagnoses_info <- diagnoses_info %>%
+  mutate(icd_code = str_pad(icd_code, width = 5, side = "left", pad = "0"))
+
+# Merge diagnoses data with descriptions
+diagnoses_info <- diagnoses_info %>%
+  left_join(d_icd_diagnoses, by = c("icd_code", "icd_version"))
+
+# Determine the appropriate column for diagnosis descriptions
+diagnosis_col <- grep("long_title", colnames(diagnoses_info), value = TRUE)
+
+if ("long_title" %in% diagnosis_col) {
+  diagnoses_info <- diagnoses_info %>% rename(diagnosis_name = long_title)
+} else if ("long_title.x" %in% diagnosis_col) {
+  diagnoses_info <- diagnoses_info %>% rename(diagnosis_name = long_title.x)
+} else if ("long_title.y" %in% diagnosis_col) {
+  diagnoses_info <- diagnoses_info %>% rename(diagnosis_name = long_title.y)
+} else {
+  stop("No long_title column detected in diagnoses_info")
+}
+
+# Extract the top three most common diagnoses, excluding missing values
+top_diagnoses <- diagnoses_info %>%
+  filter(!is.na(diagnosis_name)) %>%
+  count(diagnosis_name, sort = TRUE) %>%
+  head(3) %>%
+  pull(diagnosis_name)
+
+# Create summary text of the top diagnoses if available
+top_diagnoses_text <- ifelse(length(top_diagnoses) > 0,
+  paste(top_diagnoses, collapse = "\n"), "")
+
+# Construct a patient summary while omitting missing values
+patient_summary <- paste(
+  "Patient", 
+  subject_id, 
+  ifelse(is.na(patient_info$gender), "", patient_info$gender), 
+  ifelse(is.na(patient_info$anchor_age), "", paste(patient_info$anchor_age, "years old"))
+) %>% str_squish()
+
+# Convert timestamps in transfers_info
+transfers_info <- transfers_info %>%
+  mutate(
+    intime = as.POSIXct(intime, format = "%Y-%m-%d %H:%M:%S"),
+    outtime = as.POSIXct(outtime, format = "%Y-%m-%d %H:%M:%S")
+  ) %>%
+  filter(!is.na(outtime))  # Exclude records with missing outtime
+
+# Convert timestamps in lab events
+labevents_info <- labevents_info %>%
+  mutate(chartdate = as.POSIXct(charttime, format = "%Y-%m-%d %H:%M:%S"))
+
+# Merge procedures data with descriptions and handle duplicate columns
+procedures_info <- procedures_info %>%
+  mutate(chartdate = as.POSIXct(chartdate, format = "%Y-%m-%d %H:%M:%S")) %>%
+  left_join(d_icd_procedures, by = c("icd_code", "icd_version"))
+
+# Identify the correct column for procedure descriptions
+procedure_col <- grep("long_title", colnames(procedures_info), value = TRUE)
+
+if (length(procedure_col) > 1) {
+  procedures_info <- procedures_info %>%
+    select(-one_of(procedure_col[-1])) %>%
+    rename(procedure_name = procedure_col[1])
+} else if (length(procedure_col) == 1) {
+  procedures_info <- procedures_info %>%
+    rename(procedure_name = procedure_col[1])
+} else {
+  stop("No procedure_name column detected in procedures_info")
+}
+
+# Remove rows with missing procedure names
+procedures_info <- procedures_info %>% filter(!is.na(procedure_name))
+
+# Define colors for different care units
+care_unit_colors <- c(
+  "Emergency Department" = "red",
+  "Medicine" = "green",
+  "Neurology" = "cyan",
+  "Surgical Intensive Care Unit (SICU)" = "purple"
+)
+
+# Assign unique shapes to procedures
+procedure_shapes <- setNames(seq(15, 15 + length(unique(procedures_info$procedure_name)) - 1),
+  unique(procedures_info$procedure_name))
+
+# Define the desired y-axis order
+y_order <- factor(c("ADT", "Lab", "Procedure"), levels = c("ADT", "Lab", "Procedure"))
+
+# Create a patient trajectory visualization
+plot <- ggplot() +
+  geom_segment(
+    data = transfers_info,
+    aes(x = intime, xend = outtime, y = "ADT", yend = "ADT", color = careunit),
+    linewidth = 3
+  ) +
+  geom_point(
+    data = labevents_info,
+    aes(x = chartdate, y = "Lab"),
+    shape = 3, size = 3
+  ) +
+  geom_point(
+    data = procedures_info,
+    aes(x = chartdate, y = "Procedure", shape = procedure_name),
+    size = 5
+  ) +
+  scale_color_manual(values = care_unit_colors) +
+  scale_shape_manual(values = procedure_shapes, drop = FALSE) +
+  theme_minimal() +
+  labs(
+    title = patient_summary,
+    subtitle = top_diagnoses_text,
+    x = "Calendar Time",
+    y = NULL,
+    color = "Care Unit",
+    shape = "Procedure"
+  ) + 
+
+
+
+
+
+
+
+
 
 
 ## Q2. ICU stays
@@ -78,35 +225,57 @@ Import `icustays.csv.gz` as a tibble `icustays_tble`. **Done**
 
 ```{r}
 icustays_tble <- read_csv("~/mimic/icu/icustays.csv.gz")
-print(icustays_tble)
+head(icustays_tble)
 ```
 
 ### Q2.2 Summary and visualization
 
 How many unique `subject_id`? Can a `subject_id` have multiple ICU stays? Summarize the number of ICU stays per `subject_id` by graphs. 
 
+**(2.2) Solution ** 
+
+The number of unique subject_id there are in the (icustays_tble) tibble is 65366 unique subjects. 
 ```{r}
-#Counting number of unique 'subject_id' 
+# Count unique subject_id
 num_unique_subjects <- icustays_tble %>% 
-  summarise(unique_subjects = n_distinct(subject_id))
-print(num_unique_subjects)
+  distinct(subject_id) %>% 
+  nrow()
 
-# Count ICU stays per subject_id
-icu_stays_per_subject <- icustays_tble %>%
-  group_by(subject_id) %>%
-  summarise(num_stays = n()) %>%
-  ungroup()
-
-# Check if a subject can have multiple ICU stays
-multiple_stays <- icu_stays_per_subject %>%
-  filter(num_stays > 1) %>%
-  summarise(subjects_with_multiple_stays = n())
-
-print(multiple_stays)
+print(paste(num_unique_subjects))
 ```
 
-**(2.2) Solution ** 
-The number of unique subject_id there are in the (icustays_tble) tibble is 
+A subject_id can have multiple ICU stays. We first obtained a tibble with the number of ICU stays per subject_id. Next we filtered out the rows where the subjects only had 1 ICU stay and counted the number of remaining rows. The number of patients with multiple ICU stays is 16242. 
+
+```{r}
+icu_stays_per_subject <- icustays_tble %>% 
+  count(subject_id, name = "num_stays")
+
+num_multiple_stays <- icu_stays_per_subject %>%
+  filter(num_stays > 1) %>%
+  nrow()
+
+print(paste(num_multiple_stays))
+```
+
+The number of ICU stays per 'subject_id' is shown through the following graphs: 
+```{r}
+# Count the number of ICU stays per subject_id
+icu_stays_per_subject <- icustays_tble %>%
+  count(subject_id, name = "num_stays")
+
+# Create a histogram of ICU stays per patient with improved visualization
+ggplot(icu_stays_per_subject, aes(x = num_stays)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "black", alpha = 0.8) +
+  scale_x_continuous(breaks = seq(1, min(40, max(icu_stays_per_subject$num_stays)), by = 1),
+                     limits = c(1, min(40, max(icu_stays_per_subject$num_stays)))) +
+  scale_y_log10() +  # Apply log scale to better show variations
+  labs(title = "Distribution of ICU Stays per Patient",
+       x = "Number of ICU Stays per Patient",
+       y = "Number of Patients (log scale)") +
+  theme_minimal()
+```
+
+
 
 ## Q3. `admissions` data
 
@@ -131,7 +300,7 @@ print(admissions_tble)
 
 Summarize the following information by graphics and explain any patterns you see.
 
-- number of admissions per patient  
+- number of admissions per patient 
 
 ```{r}
 

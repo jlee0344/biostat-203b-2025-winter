@@ -258,24 +258,99 @@ print(paste(num_multiple_stays))
 ```
 
 The number of ICU stays per 'subject_id' is shown through the following graphs: 
-```{r}
-# Count the number of ICU stays per subject_id
-icu_stays_per_subject <- icustays_tble %>%
-  count(subject_id, name = "num_stays")
+We are able to see that 
+Range of ICU stays is 1-41 stays. 
 
-# Create a histogram of ICU stays per patient with improved visualization
-ggplot(icu_stays_per_subject, aes(x = num_stays)) +
-  geom_histogram(binwidth = 1, fill = "steelblue", color = "black", alpha = 0.8) +
-  scale_x_continuous(breaks = seq(1, min(40, max(icu_stays_per_subject$num_stays)), by = 1),
-                     limits = c(1, min(40, max(icu_stays_per_subject$num_stays)))) +
-  scale_y_log10() +  # Apply log scale to better show variations
-  labs(title = "Distribution of ICU Stays per Patient",
-       x = "Number of ICU Stays per Patient",
-       y = "Number of Patients (log scale)") +
+```{r}
+# Summarize ICU stays per subject_id efficiently
+icu_stays_summary <- icustays_tble %>%
+  group_by(subject_id) %>%
+  summarise(num_stays = n(), .groups = 'drop')
+
+top_patients <- icu_stays_summary %>%
+  arrange(desc(num_stays)) %>%
+  head(20)
+
+ggplot(top_patients, aes(x = reorder(subject_id, num_stays), y = num_stays)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 20 Patients with Most ICU Stays",
+       x = "Subject ID",
+       y = "Number of ICU Stays") +
   theme_minimal()
 ```
 
+```{r}
+ggplot(icu_stays_summary, aes(x = subject_id, y = num_stays)) +
+  geom_jitter(color = "blue", alpha = 0.5, width = 0.3) +
+  labs(title = "ICU Stays per Subject",
+       x = "Unique Subject ID",
+       y = "Number of ICU Stays") +
+  theme_minimal()
+```
+```{r}
+# Summarize ICU stays per subject_id
+icu_stays_summary <- icustays_tble %>%
+  group_by(subject_id) %>%
+  summarise(num_stays = n(), .groups = 'drop')
 
+# Define 5 groups based on ICU stay ranges
+icu_stays_summary <- icu_stays_summary %>%
+  mutate(stay_group = case_when(
+    num_stays >= 1  & num_stays <= 8  ~ "1-8 stays",
+    num_stays >= 9  & num_stays <= 16 ~ "9-16 stays",
+    num_stays >= 17 & num_stays <= 24 ~ "17-24 stays",
+    num_stays >= 25 & num_stays <= 32 ~ "25-32 stays",
+    num_stays >= 33 & num_stays <= 41 ~ "33-41 stays"
+  ))
+
+# Order data by number of stays for better visualization
+icu_stays_summary <- icu_stays_summary %>%
+  arrange(num_stays)
+
+# Assign numeric index for x-axis
+icu_stays_summary <- icu_stays_summary %>%
+  mutate(patient_index = row_number())
+
+# Plot: Color-coded scatter plot of patients by ICU stay group
+ggplot(icu_stays_summary, aes(x = patient_index, y = num_stays, color = stay_group)) +
+  geom_point(alpha = 0.6, size = 2) + 
+  labs(title = "ICU Stays per Subject (Grouped by Number of Stays)",
+       x = "Patients (Sorted by ICU Stays)",
+       y = "Number of ICU Stays",
+       color = "ICU Stay Group") +
+  theme_minimal() +
+  scale_color_manual(values = c("blue", "green", "orange", "red", "purple"))
+```
+
+
+```{r}
+# Summarize ICU stays per subject_id
+icu_stays_summary <- icustays_tble %>%
+  group_by(subject_id) %>%
+  summarise(num_stays = n(), .groups = 'drop')
+
+# Define 5 groups based on ICU stay ranges
+icu_stays_summary <- icu_stays_summary %>%
+  mutate(stay_group = case_when(
+    num_stays >= 1  & num_stays <= 8  ~ "1-8 stays",
+    num_stays >= 9  & num_stays <= 16 ~ "9-16 stays",
+    num_stays >= 17 & num_stays <= 24 ~ "17-24 stays",
+    num_stays >= 25 & num_stays <= 32 ~ "25-32 stays",
+    num_stays >= 33 & num_stays <= 41 ~ "33-41 stays"
+  ))
+
+# Plot: Color-coded scatter plot of patients by ICU stay group (keeping original subject_id order)
+ggplot(icu_stays_summary, aes(x = subject_id, y = num_stays, color = stay_group)) +
+  geom_point(alpha = 0.6, size = 2) + 
+  labs(title = "ICU Stays per Subject (Using Subject ID on X-Axis)",
+       x = "Subject ID",
+       y = "Number of ICU Stays",
+       color = "ICU Stay Group") +
+  theme_minimal() +
+  scale_color_manual(values = c("blue", "green", "orange", "red", "purple"))  # Assigning colors
+
+```
 
 ## Q3. `admissions` data
 
@@ -307,10 +382,37 @@ Summarize the following information by graphics and explain any patterns you see
 ```
 
 - admission hour (anything unusual?)  
+```{r}
+# Extract hour of admission
+admissions_tble <- admissions_tble %>%
+  mutate(admit_hour = hour(admittime))  # Extract hour from POSIXct datetime
 
+# Plot the distribution of admission hours
+ggplot(admissions_tble, aes(x = admit_hour)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "black", alpha = 0.8) +
+  scale_x_continuous(breaks = seq(0, 23, by = 1)) +  # Ensure all hours are visible
+  labs(title = "Distribution of ICU Admissions by Hour",
+       x = "Hour of Admission (24-hour format)",
+       y = "Number of Admissions") +
+  theme_minimal()
+
+```
 
 - admission minute (anything unusual?)  
 ```{r}
+
+# Extract the minute of admission
+admissions_tble <- admissions_tble %>%
+  mutate(admit_minute = minute(admittime))  # Extract minute from POSIXct datetime
+
+# Plot the distribution of admission minutes
+ggplot(admissions_tble, aes(x = admit_minute)) +
+  geom_histogram(binwidth = 1, fill = "darkorange", color = "black", alpha = 0.8) +
+  scale_x_continuous(breaks = seq(0, 59, by = 5)) +  # Ensure visibility for all minutes
+  labs(title = "Distribution of ICU Admissions by Minute",
+       x = "Minute of Admission (0-59)",
+       y = "Number of Admissions") +
+  theme_minimal()
 
 ```
 
@@ -345,6 +447,9 @@ print(patients_tble)
 
 Summarize variables `gender` and `anchor_age` by graphics, and explain any patterns you see.
 
+```{r}
+
+```
 
 ## Q5. Lab results
 
@@ -398,6 +503,44 @@ The final `mimic_icu_cohort` should have one row per ICU stay and columns for ea
 ![](mimic_icu_cohort.png)
 
 ```{r}
+# Filter ICU stays for adults (age >= 18 at intime)
+icustays_adults <- icustays_tble %>%
+  filter(anchor_age >= 18)
+
+# Merge ICU stays with admissions and patient data
+mimic_icu_cohort <- icustays_adults %>%
+  left_join(admissions_tble, by = c("subject_id", "hadm_id")) %>%
+  left_join(patients_tble, by = "subject_id")
+
+# Get last lab measurement before ICU admission
+last_labs <- labevents_tble %>%
+  filter(charttime < intime) %>%  # Ensure measurement is before ICU stay
+  group_by(subject_id, hadm_id, stay_id, itemid) %>%  # Group by patient & test type
+  slice_max(charttime, n = 1) %>%  # Select the latest measurement
+  ungroup()
+
+# Merge last lab measurements into cohort
+mimic_icu_cohort <- mimic_icu_cohort %>%
+  left_join(last_labs, by = c("subject_id", "hadm_id", "stay_id"))
+
+
+# Get first vital sign measurement during ICU stay
+first_vitals <- chartevents_tble %>%
+  filter(charttime >= intime) %>%  # Ensure measurement is during ICU stay
+  group_by(subject_id, hadm_id, stay_id, itemid) %>%  # Group by patient & vital sign type
+  slice_min(charttime, n = 1) %>%  # Select the earliest measurement
+  ungroup()
+
+# Merge first vital signs into cohort
+mimic_icu_cohort <- mimic_icu_cohort %>%
+  left_join(first_vitals, by = c("subject_id", "hadm_id", "stay_id"))
+
+# Check final dataset
+glimpse(mimic_icu_cohort)  # View structure
+
+# Preview first few rows
+head(mimic_icu_cohort)
+
 
 ```
 

@@ -53,6 +53,11 @@ ln -s ~/biostat-203b-2025-winter/hw2/labevents_parquet ./labevents_pq
 ls -l ./labevents_pq
 ```
 
+```{bash}
+ln -s ~/biostat-203b-2025-winter/hw2/chartevents_parquet ./chartevents_pq
+ls -l ./chartevents_pq
+```
+
 ```{r}
 patients <- read_csv("~/mimic/hosp/patients.csv.gz")
 admissions <- read_csv("~/mimic/hosp/admissions.csv.gz")
@@ -65,8 +70,6 @@ d_icd_diagnoses <- read_csv("~/mimic/hosp/d_icd_diagnoses.csv.gz")
 icustays <- read_csv("~/mimic/icu/icustays.csv.gz")
 d_items <- read_csv("~/mimic/icu/d_items.csv.gz")
 ```
-
-
 
 ```{r}
 # Filter data for patient 10063848
@@ -83,13 +86,10 @@ icustays_info <- icustays %>% filter(subject_id == !!subject_id)
 d_items_info <- d_items %>% filter(subject_id == !!subject_id)
 ```
 
-
 ```{r}
-# Standardize ICD code format before merging
 diagnoses_info <- diagnoses_info %>%
   mutate(icd_code = str_pad(icd_code, width = 5, pad = "0"))
 
-# Merge diagnoses with descriptions
 diagnoses_info <- diagnoses_info %>% 
   left_join(d_icd_diagnoses, by = c("icd_code", "icd_version"))
 
@@ -182,10 +182,6 @@ procedure_shapes <- setNames(
 procedures_info <- procedures_info %>%
   mutate(procedure_name = factor(procedure_name, levels = unique_procedures))
 
-# Debugging: Print extracted care units and procedures
-print("Unique Care Units:"); print(unique_care_units)
-print("Unique Procedures:"); print(unique_procedures)
-
 ### **Plot Patient Trajectory** ###
 plot <- ggplot() +
   geom_segment(data = transfers_info, 
@@ -221,20 +217,19 @@ plot <- ggplot() +
 
 print(plot)
 
-
 ```
-
-
-
 
 **1.2** 
+change time zone of charttime  from US (-7) to UTC to match other two time variables
 
+Select stay_id as well in the filtered chartevent and save it in hw3 folder. Or keep the filtered chartevent generated in hw2 without stay_id and use charttime in chartevent and intime outtime in icustays table to keep only values during each stay
+subject_id ⊃ hadm_id ⊃ stay_id, meaning that, for example, using select(subject_id, stay_id ) and join by both is equivalent to select(-subject_id, stay_id ) and join by stay_id etc.
+
+**Solution ** Note that the dataset that I selected is the filtered chart_events parquet file that was created in Homework #2 with the modification of adding in stay_id as well as including the item_id "Diastolic Non-invasive blood pressure (2210180) instead of mean non-invasive blood pressure (2200181). 
 
 ```{r}
-
+subset_chartevents
 ```
-
-
 
 
 ```{r}
@@ -283,8 +278,8 @@ print(paste(num_multiple_stays))
 ```
 
 The number of ICU stays per 'subject_id' is shown through the following graphs: 
-We are able to see that 
-Range of ICU stays is 1-41 stays. 
+
+1. Depicted below is a bar graph that displays the number of ICU stays for the top 20 pateints with the most ICU stays. We can see that the maximum number of ICU stays amongst these 20 individuals ranges from between 19 to 41 ICU stays (including admission and discharge times). The general range of ICU stays is 1-41 stays. 
 
 ```{r}
 # Summarize ICU stays per subject_id efficiently
@@ -305,14 +300,8 @@ ggplot(top_patients, aes(x = reorder(subject_id, num_stays), y = num_stays)) +
   theme_minimal()
 ```
 
-```{r}
-ggplot(icu_stays_summary, aes(x = subject_id, y = num_stays)) +
-  geom_jitter(color = "blue", alpha = 0.5, width = 0.3) +
-  labs(title = "ICU Stays per Subject",
-       x = "Unique Subject ID",
-       y = "Number of ICU Stays") +
-  theme_minimal()
-```
+2. Below is a graph that visualizes the number of ICU stays per subject_id, with patients sorted in ascending order by the number of stays (each subject_id or patient is ranked starting from 1 depending on how many ICU stays they have). The visualization employs a color-coded scatter plot to distinguish different groups of ICU stays. Patients are grouped based on the number of ICU stays: 1. 1-8 stays (blue), 2. 9-16 stays (green), 3. 17-24 stays (orange), 4. 25-32 stays (red), 5. 33-41 stays (purple). From the scatter plot, we observe that the majority of points are blue, indicating that most patients fall within the 1-8 ICU stays range. This suggests that ICU stays are generally short for most patients. However, towards the right of the graph, the number of ICU stays increases steeply, forming a long-tail distribution. This pattern indicates that a small number of patients experience significantly higher ICU admissions. Overall, the distribution follows a right-skewed pattern, where most patients have a low ICU stay count, while a few patients have disproportionately high ICU stays. 
+
 ```{r}
 # Summarize ICU stays per subject_id
 icu_stays_summary <- icustays_tble %>%
@@ -348,6 +337,7 @@ ggplot(icu_stays_summary, aes(x = patient_index, y = num_stays, color = stay_gro
   scale_color_manual(values = c("blue", "green", "orange", "red", "purple"))
 ```
 
+3. This graph provides similar information from the one above. The scatter plot visualzies the nummber of ICU stays per subject, using the specific specific id of each patient on the x-axis and the number of ICU stays on the y-axis. Each patient is categorized into different ICU stay groups, represented by distinct colors. The majority of patients have few ICU stays (1-8 stays) as depicted in blue. There is a small subset of patients that require frequent ICU visits as depicted in other colors other than blue. 
 
 ```{r}
 # Summarize ICU stays per subject_id
@@ -402,7 +392,7 @@ Summarize the following information by graphics and explain any patterns you see
 
 1. Number of admissions per patient 
 
-**Analysis:** The histogram represents the distribution of hospital admissions per patient on a log scale. The x-axis, which was log-transformed represents the number of admissions per patient while the y-axis represents the number of patients. We are able to see from the histogram that the majority of patients have only 1-3 admissions, but a few patients have significantly higher admission counts. A small subset of patients have 10+ admissions, with some extreme cases exceeding 200 admissions. 
+**Analysis:** The histogram illustrates the distribution of hospital admissions per patient on a log scale. The x-axis (log-transformed) represents the number of admissions per patient, while the y-axis represents the number of patients. From the histogram, we observe that the majority of patients have only 1-3 admissions, indicating that most individuals require minimal hospital visits. However, a small subset of patients exhibit significantly higher admission counts, with some exceeding 10+ admissions. Notably, a few extreme cases surpass 200 admissions, highlighting a group of patients with frequent and recurrent hospitalizations. 
 
 ```{r}
 admissions_summary <- admissions_tble %>%
@@ -458,7 +448,8 @@ ggplot(admissions_tble, aes(x = admit_minute)) +
 4. Length of hospital stay (from admission to discharge) (anything unusual?)  
 
 **Analysis** 
-There 
+
+The histogram visualizes the distribution of hospital length of stay, capped at 30 days.There is an unusually high number of 1-day stays, far exceeding other lengths, which may indicate short-term admissions, observation cases, or administrative coding practices. A notable concentration of patients at exactly 30 days suggests policy-driven discharge patterns or dataset truncation. The red density curve extends close to 30 days rather than sharply declining, indicating a subset of patients with prolonged hospitalizations, likely due to chronic conditions or severe cases.
 
 ```{r}
 # Focus on hospital stays of 30 days or less
@@ -470,31 +461,11 @@ ggplot(short_stays, aes(x = length_of_stay)) +
   geom_histogram(binwidth = 1, fill = "steelblue", color = "black", alpha = 0.8) +
   geom_density(color = "red", size = 1, alpha = 0.6) +
   scale_x_continuous(breaks = seq(0, 30, by = 5)) +
-  labs(title = "Refined Distribution of Hospital Length of Stay (≤ 30 Days)",
-       x = "Length of Stay (Days)",
-       y = "Number of Patients") +
-  theme_minimal()
-
-```
-
-```{r}
-# Filter for patients with very long stays (>30 days)
-long_stay_patients <- admissions_tble %>%
-  filter(length_of_stay > 30)
-
-# Summary statistics for long-stay patients
-summary(long_stay_patients$length_of_stay)
-
-# Histogram of long stays
-ggplot(long_stay_patients, aes(x = length_of_stay)) +
-  geom_histogram(binwidth = 5, fill = "red", color = "black", alpha = 0.8) +
-  scale_x_continuous(breaks = seq(30, max(long_stay_patients$length_of_stay, na.rm = TRUE), by = 10)) +
-  labs(title = "Distribution of Patients with Long Hospital Stays (>30 Days)",
+  labs(title = "Distribution of Hospital Length of Stay (≤ 30 Days)",
        x = "Length of Stay (Days)",
        y = "Number of Patients") +
   theme_minimal()
 ```
-
 
 According to the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/about/concepts/#date-shifting), 
 
@@ -502,7 +473,8 @@ According to the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/about/co
 
 ## Q4. `patients` data
 
-Patient information is available in `patients.csv.gz`. See <https://mimic.mit.edu/docs/iv/modules/hosp/patients/> for details of each field in this file. The first 10 lines are
+Patient information is available in `patients.csv.gz`. See <https://mimic.mit.edu/docs/iv/modules/hosp/patients/> for details of each field in this file. The first 10 lines are: 
+
 ```{bash}
 zcat < ~/mimic/hosp/patients.csv.gz | head
 ```
@@ -519,10 +491,7 @@ print(patients_tble)
 
 Summarize variables `gender` and `anchor_age` by graphics, and explain any patterns you see.
 
-gender, the genotypical sex of the patient. 
-anchor_age is the patient's age in the anchor_year. If a patient's anchor_age is over 89 in the anchor_year then their ancho_age is set to 91, regardless of how old they actually are. 
-
-Gender: 
+**Summary graph of Gender (genotypical sex of the patient): ** 
 ```{r}
 # Bar Plot: Gender Distribution with Custom Colors
 ggplot(patients_tble, aes(x = gender, fill = gender)) +
@@ -535,7 +504,10 @@ ggplot(patients_tble, aes(x = gender, fill = gender)) +
 
 ```
 
-Anchor_age: 
+**Summary Graph of Ancho_Age: ** 
+
+It is important to note that anchor_age corresponds to patient's age in the anchor_year. If a patient's anchor_age is over 89 in the anchor_year then their ancho_age is set to 91, regardless of how old they actually are. 
+
 ```{r}
 # 2. Histogram: Age Distribution
 ggplot(patients_tble, aes(x = anchor_age)) +
@@ -557,6 +529,7 @@ ggplot(patients_tble, aes(x = gender, y = anchor_age, fill = gender)) +
   theme_minimal() +
   scale_fill_manual(values = c("blue", "pink"))  # Custom colors for M & F
 ```
+
 ## Q5. Lab results
 
 `labevents.csv.gz` (<https://mimic.mit.edu/docs/iv/modules/hosp/labevents/>) contains all laboratory measurements for patients. The first 10 lines are
@@ -582,57 +555,72 @@ ls -l ./labevents_pq
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `labevents_pq` folder available at the current working directory `hw3`, for example, by a symbolic link.
 
 ```{r}
-# Read the Parquet file
-labevents_tble <- read_parquet("./labevents_pq/part-0.parquet")
-head(labevents_tble)
+library(duckdb)
+parquet_file <- "labevents_pq/part-0.parquet"
+start_time <- Sys.time()
+arrow_data <- open_dataset(parquet_file, format = "parquet")
+duckdb_conn <- dbConnect(duckdb::duckdb())
+
+invisible(to_duckdb(
+  .data = arrow_data,
+  con = duckdb_conn,
+  table_name = "labevents",
+  auto_disconnect = FALSE
+))  
+
+subset_labevents <- tbl(duckdb_conn, "labevents") %>%
+  filter(itemid %in% c(50912, 50971, 50983, 50902, 
+                       50882, 51221, 51301, 50931)) %>%
+  arrange(subject_id, charttime, itemid,) %>% 
+  collect()
+
+cat("Number of rows in the result:", nrow(subset_labevents ), "\n")
+print(head(subset_labevents , 10)) 
+dbDisconnect(duckdb_conn)
 ```
 
 
 ```{r}
-dlabitems_tble <- dlabitems_tble %>%
-  mutate(itemid = as.integer(itemid))
-str(dlabitems_tble)
+dlabitems_tble <- read_csv("~/mimic/hosp/d_labitems.csv.gz")
+icustays_tble
+subset_labevents 
 ```
+
+Creating a dictionary: 
+```{r}
+dlabitems_tble
+```
+
 
 ```{r}
- dlabitems_tble <- read_csv ("~/mimic/hosp/d_labitems.csv.gz")
+lab_items <- c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931)  
 
-# Read in lab events data file
-open_dataset(sources = "./labevents_pq/part-0.parquet",
-             format = "parquet") |>
-# create a virtual table in DuckDB
-to_duckdb() |>
-# select the columns
-select(subject_id, itemid, storetime, valuenum) |>
-# restrict to itemid of interest
-filter(itemid %in% local(dlabitems_tble$itemid)) |>
-# pull in the intime of ICU stays, copy = TRUE to avoid modifying the original table
-left_join(
-    select(icustays_tble, subject_id, stay_id, intime),
-    by = c("subject_id"),
-    copy = TRUE) |>
-# only keep lab items available to provider before this ICU stay
-filter(storetime < intime) |>
-# group by subject_id and itemid
-group_by(subject_id, stay_id, itemid) |>
-# only keep the last lab value before ICU stay
-slice_max(storetime, n = 1) |>
-# do not need storetime and intime
-select(-storetime, -intime) |>
-ungroup() |>
-pivot_wider(names_from = itemid, values_from = valuenum) |>
-# readable column names
-rename_at(
-    vars(as.character(dlabitems_tble$itemid)),
-    ~ str_to_lower(dlabitems_tble$itemid)
-) |>
-# force computation
-collect() |>
-# sort for grading purposes
-arrange(subject_id, stay_id) |>
-relocate(subject_id, stay_id, sort(names(.))) 
+labevents_filtered <- subset_labevents %>%
+  filter(itemid %in% lab_items) %>%  # Keep only relevant lab tests
+  inner_join(icustays_tble, by = "subject_id") %>%
+  filter(storetime < intime)  # Ensure measurements are before ICU stay
+
+labevents_filtered <- labevents_filtered %>%
+  mutate(value = as.numeric(value))
+
+labevents_last <- labevents_filtered %>%
+  group_by(subject_id, stay_id, itemid) %>%
+  slice_max(order_by = storetime, n = 1, with_ties = FALSE) %>%  
+  ungroup()
+
+labevents_wide <- labevents_last %>%
+  select(subject_id, stay_id, itemid, value) %>%
+  pivot_wider(names_from = itemid, values_from = value)
+
+colnames(labevents_wide) <- c("subject_id", "stay_id", "bicarbonate", "chloride", "creatinine",
+                              "glucose", "potassium", "sodium", "hematocrit", "wbc")
+
+labevents_wide <- labevents_wide %>%
+  mutate(across(where(is.list), ~ as.numeric(unlist(.))))
+
+print("Data processing complete.")
+print(head(labevents_wide)) 
 ```
-
 
 ## Q6. Vitals from charted events
 
@@ -650,23 +638,45 @@ We are interested in the vitals for ICU patients: heart rate (220045), systolic 
 
 ![](chartevents_tble.png)
 
-
-Ingesting the file: chartevents.csv.gz 
+**Solution ** It is important to note that I created a different chartevents_parquet file from the one in Homework #2. This is due to the fact that there is a dispreancy between the two homrwork (in homework #2, we collect data including mean non-invasive blood pressure: 220181 while in homework #3, we collect data including diastolic non-invasive blood pressure  220180). Presented below is the chartevents_pq file that includes information regarding diastolic non-invasive blood pressure (220180). 
 
 ```{r}
-# Read the CSV file (handling compressed .gz format)
-labevents_tble <- read_csv("labevents.csv.gz")
+parquet_file <- "chartevents_pq/part-0.parquet"
+start_time <- Sys.time()
+arrow_data <- open_dataset(parquet_file, format = "parquet")
+duckdb_conn <- dbConnect(duckdb::duckdb())
 
-# Convert timestamps to POSIXct (datetime) format
-labevents_tble <- labevents_tble %>%
-  mutate(storetime = parse_date_time(storetime, orders = c("ymd HMS", "ymd")))
+invisible(to_duckdb(
+  .data = arrow_data,
+  con = duckdb_conn,
+  table_name = "chartevents",
+  auto_disconnect = FALSE
+))  
 
-# Save as Parquet format
-write_parquet(labevents_tble, "labevents.parquet")
+subset_chartevents <- tbl(duckdb_conn, "chartevents") %>%
+  filter(itemid %in% c(220045, 220179, 220180, 223761, 220210)) %>%
+  arrange(subject_id, charttime, itemid,) %>% 
+  collect()
 
-# Verify that the Parquet file is created correctly
-print(head(labevents_tble))
+cat("Number of rows in the result:", nrow(subset_chartevents ), "\n")
+print(head(subset_chartevents , 10)) 
+dbDisconnect(duckdb_conn)
 ```
+
+(delete later) retrieve a subset of chartevents.csv.gz only containing these items for patients in icystays_tble. 
+more filter to the first vital measurement by store time within the ICU stay. 
+
+Note: icustays_tble has 8 columns: subject_id, hadm_id, stay_id, first_careunit, last_careunit, intime, outtime, los 
+
+```{r} 
+icustays_tble
+```
+
+
+```{r} 
+subset_chartevents 
+```
+
 
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `chartevents_pq` folder available at the current working directory, for example, by a symbolic link.
 

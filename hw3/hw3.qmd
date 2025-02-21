@@ -54,8 +54,12 @@ ln -s ~/biostat-203b-2025-winter/hw2/labevents_parquet ./labevents_pq
 ls -l ./labevents_pq
 ```
 
+
 ```{bash}
 ln -s ~/biostat-203b-2025-winter/hw2/chartevents_parquet ./chartevents_pq
+```
+
+```{bash}
 ls -l ./chartevents_pq
 ```
 
@@ -509,7 +513,7 @@ ggplot(patients_tble, aes(x = gender, fill = gender)) +
 ```
 
 
-**Summary Graph of Ancho_Age: ** 
+**Summary Graph of Anchor_Age: ** 
 
 Anchor_age represents a patient's age in the anchor_year. If a patient is over 89 years old, their anchor_age is set to 91, regardless of their actual age. The histogram depicts the age distribution of patients, showing a right-skewed pattern. Younger patients (under 25) make up the largest group. The number of patients gradually declines with age, though there is a slight increase around ages 45-65. Fewer patients are observed in older age groups (75+ years), which aligns with natural aging and mortality trends.
 
@@ -628,7 +632,6 @@ zcat < ~/mimic/icu/d_items.csv.gz | head
 We are interested in the vitals for ICU patients: heart rate (220045), systolic non-invasive blood pressure (220179), diastolic non-invasive blood pressure (220180), body temperature in Fahrenheit (223761), and respiratory rate (220210). Retrieve a subset of `chartevents.csv.gz` only containing these items for the patients in `icustays_tble`. Further restrict to the first vital measurement within the ICU stay. The final `chartevents_tble` should have one row per ICU stay and columns for each vital measurement. 
 
 ![](chartevents_tble.png)
-
 **Solution ** It is important to note that I created a different chartevents_parquet file from the one in Homework #2. This is due to the fact that there is a dispreancy between the two homrwork (in homework #2, we collect data including mean non-invasive blood pressure: 220181 while in homework #3, we collect data including diastolic non-invasive blood pressure  220180). Presented below is the chartevents_pq file that includes information regarding diastolic non-invasive blood pressure (220180). 
 
 ```{r}
@@ -654,6 +657,7 @@ print(head(subset_chartevents , 10))
 dbDisconnect(duckdb_conn)
 ```
 
+
 (delete later) retrieve a subset of chartevents.csv.gz only containing these items for patients in icystays_tble. 
 more filter to the first vital measurement by store time within the ICU stay. 
 
@@ -663,14 +667,9 @@ Note: icustays_tble has 8 columns: subject_id, hadm_id, stay_id, first_careunit,
 icustays_tble
 ```
 
-
 ```{r} 
 subset_chartevents 
 ```
-
-
-
-
 
 
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `chartevents_pq` folder available at the current working directory, for example, by a symbolic link.

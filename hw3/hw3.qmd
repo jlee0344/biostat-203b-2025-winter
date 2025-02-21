@@ -26,6 +26,7 @@ library(memuse)
 library(pryr)
 library(R.utils)
 library(tidyverse)
+library(duckdb)
 ```
 
 Display your machine memory.
@@ -487,11 +488,14 @@ Import `patients.csv.gz` (<https://mimic.mit.edu/docs/iv/modules/hosp/patients/>
 patients_tble <- read_csv("~/mimic/hosp/patients.csv.gz")
 print(patients_tble)
 ```
+
 ### Q4.2 Summary and visualization
 
 Summarize variables `gender` and `anchor_age` by graphics, and explain any patterns you see.
 
-**Summary graph of Gender (genotypical sex of the patient): ** 
+**Summary Graph of Gender (genotypical sex of the patient): ** 
+The bar chart illustrates the gender distribution of patients, showing a slight female majority. While females are more frequent than males, the difference is not substantial, indicating a fairly balanced representation of both genders in the dataset.
+
 ```{r}
 # Bar Plot: Gender Distribution with Custom Colors
 ggplot(patients_tble, aes(x = gender, fill = gender)) +
@@ -504,9 +508,10 @@ ggplot(patients_tble, aes(x = gender, fill = gender)) +
 
 ```
 
+
 **Summary Graph of Ancho_Age: ** 
 
-It is important to note that anchor_age corresponds to patient's age in the anchor_year. If a patient's anchor_age is over 89 in the anchor_year then their ancho_age is set to 91, regardless of how old they actually are. 
+Anchor_age represents a patient's age in the anchor_year. If a patient is over 89 years old, their anchor_age is set to 91, regardless of their actual age. The histogram depicts the age distribution of patients, showing a right-skewed pattern. Younger patients (under 25) make up the largest group. The number of patients gradually declines with age, though there is a slight increase around ages 45-65. Fewer patients are observed in older age groups (75+ years), which aligns with natural aging and mortality trends.
 
 ```{r}
 # 2. Histogram: Age Distribution
@@ -518,7 +523,9 @@ ggplot(patients_tble, aes(x = anchor_age)) +
   theme_minimal()
 ```
 
-Combining the 2 variables together: Gender and Anchor_Age: 
+**Visualizing the 2 variables together: Gender and Anchor_Age: ** 
+The box plot visualizes the age distribution of patients by genders, females and males. The median age is nearly the same for both genders, suggesting no significiant 
+
 ```{r}
 # 3. Box Plot: Age by Gender
 ggplot(patients_tble, aes(x = gender, y = anchor_age, fill = gender)) +
@@ -573,53 +580,37 @@ subset_labevents <- tbl(duckdb_conn, "labevents") %>%
                        50882, 51221, 51301, 50931)) %>%
   arrange(subject_id, charttime, itemid,) %>% 
   collect()
-
-cat("Number of rows in the result:", nrow(subset_labevents ), "\n")
-print(head(subset_labevents , 10)) 
 dbDisconnect(duckdb_conn)
 ```
-
-
-```{r}
-dlabitems_tble <- read_csv("~/mimic/hosp/d_labitems.csv.gz")
-icustays_tble
-subset_labevents 
-```
-
-Creating a dictionary: 
-```{r}
-dlabitems_tble
-```
-
 
 ```{r}
 lab_items <- c(50912, 50971, 50983, 50902, 50882, 51221, 51301, 50931)  
 
 labevents_filtered <- subset_labevents %>%
-  filter(itemid %in% lab_items) %>%  # Keep only relevant lab tests
   inner_join(icustays_tble, by = "subject_id") %>%
-  filter(storetime < intime)  # Ensure measurements are before ICU stay
+  filter(storetime < intime) 
 
 labevents_filtered <- labevents_filtered %>%
-  mutate(value = as.numeric(value))
+  mutate(valuenum = as.numeric(valuenum))
 
 labevents_last <- labevents_filtered %>%
   group_by(subject_id, stay_id, itemid) %>%
   slice_max(order_by = storetime, n = 1, with_ties = FALSE) %>%  
   ungroup()
 
-labevents_wide <- labevents_last %>%
-  select(subject_id, stay_id, itemid, value) %>%
-  pivot_wider(names_from = itemid, values_from = value)
+labevents_tble <- labevents_last %>%
+  select(subject_id, stay_id, itemid, valuenum) %>%
+  pivot_wider(names_from = itemid, values_from = valuenum)
 
-colnames(labevents_wide) <- c("subject_id", "stay_id", "bicarbonate", "chloride", "creatinine",
+colnames(labevents_tble) <- c("subject_id", "stay_id", "bicarbonate", "chloride", "creatinine",
                               "glucose", "potassium", "sodium", "hematocrit", "wbc")
 
-labevents_wide <- labevents_wide %>%
+labevents_tble <- labevents_tble %>%
   mutate(across(where(is.list), ~ as.numeric(unlist(.))))
 
-print("Data processing complete.")
-print(head(labevents_wide)) 
+cat("Data processing complete.\n")
+print(head(labevents_tble)) 
+
 ```
 
 ## Q6. Vitals from charted events
@@ -676,6 +667,10 @@ icustays_tble
 ```{r} 
 subset_chartevents 
 ```
+
+
+
+
 
 
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `chartevents_pq` folder available at the current working directory, for example, by a symbolic link.

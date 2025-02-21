@@ -232,14 +232,97 @@ subject_id ⊃ hadm_id ⊃ stay_id, meaning that, for example, using select(subj
 
 **Solution ** Note that the dataset that I selected is the filtered chart_events parquet file that was created in Homework #2 with the modification of adding in stay_id as well as including the item_id "Diastolic Non-invasive blood pressure (2210180) instead of mean non-invasive blood pressure (2200181). 
 
+keep this 
 ```{r}
-subset_chartevents
+parquet_file <- "chartevents_pq/part-0.parquet"
+start_time <- Sys.time()
+arrow_data <- open_dataset(parquet_file, format = "parquet")
+duckdb_conn <- dbConnect(duckdb::duckdb())
+
+invisible(to_duckdb(
+  .data = arrow_data,
+  con = duckdb_conn,
+  table_name = "chartevents",
+  auto_disconnect = FALSE
+))  
+
+subset_chartevents <- tbl(duckdb_conn, "chartevents") %>%
+  filter(itemid %in% c(220045, 220179, 220180, 223761, 220210)) %>%
+  arrange(subject_id, charttime, itemid,) %>% 
+  collect()
+
+cat("Number of rows in the result:", nrow(subset_chartevents ), "\n")
+print(head(subset_chartevents , 10)) 
+dbDisconnect(duckdb_conn)
 ```
+
+#delete this later
+```{r}
+d_items <- read_csv("~/mimic/icu/d_items.csv.gz")
+subset_chartevents 
+d_items
+icustays_tble
+```
+
+code for the graph 1.2
+
+```{r}
+
+# Define the subject_id of interest
+subject_id_of_interest <- 10001217
+
+# Filter ICU stays for the subject
+subject_stays <- icustays_tble %>%
+  filter(subject_id == subject_id_of_interest) %>%
+  select(stay_id, intime, outtime)
+
+# Get the relevant stay_ids
+stay_ids <- subject_stays$stay_id
+
+# Filter chartevents for the subject's ICU stays
+chartevents_filtered <- subset_chartevents %>%
+  filter(stay_id %in% stay_ids) %>%
+  inner_join(subject_stays, by = "stay_id") %>%
+  filter(charttime >= intime & charttime <= outtime) %>%
+  select(stay_id, itemid, charttime, valuenum)
+
+# Join with d_items to get the abbreviations of vitals
+chartevents_with_labels <- chartevents_filtered %>%
+  inner_join(d_items %>% select(itemid, abbreviation), by = "itemid")
+
+# Convert charttime to datetime for proper plotting
+chartevents_with_labels <- chartevents_with_labels %>%
+  mutate(charttime = as_datetime(charttime))
+
+# Create the plot
+ggplot(chartevents_with_labels, aes(x = charttime, y = valuenum, color = abbreviation)) +
+  geom_point(size = 1.2) +  # Make points more visible
+  geom_line(size = 0.8) +   # Make lines smooth and readable
+  facet_grid(abbreviation ~ stay_id, scales = "free_y") +  # Facet by abbreviation and stay_id
+  labs(
+    title = paste("Patient", subject_id_of_interest, "ICU stays - Vitals"),
+    x = "Time",
+    y = "Vital Value",
+    color = "Vital Type"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12, face = "bold"),  # Make facet labels bold
+    axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels for readability
+    panel.grid.major = element_line(size = 0.5, linetype = "dotted", color = "gray"),  # Light grid lines
+    panel.grid.minor = element_blank()  # Remove minor grid lines
+  )
+
+```
+
 
 
 ```{r}
 ## Q2. ICU stays
-`icustays.csv.gz` (<https://mimic.mit.edu/docs/iv/modules/icu/icustays/>) contains data about Intensive Care Units (ICU) stays. The first 10 lines are
+`icustays.csv.gz` (<https://mimic.mit.edu/docs/iv/modules/icu/icustays/>) contains data about Intensive Care Units (ICU) stays. The first 10 lines are: 
+```
+
+
 ```{bash}
 zcat < ~/mimic/icu/icustays.csv.gz | head
 ```
@@ -634,41 +717,75 @@ We are interested in the vitals for ICU patients: heart rate (220045), systolic 
 ![](chartevents_tble.png)
 **Solution ** It is important to note that I created a different chartevents_parquet file from the one in Homework #2. This is due to the fact that there is a dispreancy between the two homrwork (in homework #2, we collect data including mean non-invasive blood pressure: 220181 while in homework #3, we collect data including diastolic non-invasive blood pressure  220180). Presented below is the chartevents_pq file that includes information regarding diastolic non-invasive blood pressure (220180). 
 
-```{r}
-parquet_file <- "chartevents_pq/part-0.parquet"
-start_time <- Sys.time()
-arrow_data <- open_dataset(parquet_file, format = "parquet")
-duckdb_conn <- dbConnect(duckdb::duckdb())
-
-invisible(to_duckdb(
-  .data = arrow_data,
-  con = duckdb_conn,
-  table_name = "chartevents",
-  auto_disconnect = FALSE
-))  
-
-subset_chartevents <- tbl(duckdb_conn, "chartevents") %>%
-  filter(itemid %in% c(220045, 220179, 220180, 223761, 220210)) %>%
-  arrange(subject_id, charttime, itemid,) %>% 
-  collect()
-
-cat("Number of rows in the result:", nrow(subset_chartevents ), "\n")
-print(head(subset_chartevents , 10)) 
-dbDisconnect(duckdb_conn)
-```
-
-
-(delete later) retrieve a subset of chartevents.csv.gz only containing these items for patients in icystays_tble. 
-more filter to the first vital measurement by store time within the ICU stay. 
-
-Note: icustays_tble has 8 columns: subject_id, hadm_id, stay_id, first_careunit, last_careunit, intime, outtime, los 
 
 ```{r} 
 icustays_tble
 ```
 
+Code for question 6: 
 ```{r} 
-subset_chartevents 
+# Ensure timestamps are in correct format
+subset_chartevents <- subset_chartevents %>%
+  mutate(
+    storetime = as.POSIXct(storetime, format="%Y-%m-%d %H:%M:%S", tz="UTC"),
+    charttime = as.POSIXct(charttime, format="%Y-%m-%d %H:%M:%S", tz="UTC")
+  )
+
+# Merge with ICU stays to keep only relevant ICU patients
+chartevents_filtered <- subset_chartevents %>%
+  inner_join(icustays_tble, by = "stay_id") %>%
+  filter(storetime >= intime & storetime <= outtime)  # Ensure measurements are within ICU stay
+
+# Remove duplicate `subject_id` if both exist
+chartevents_filtered <- chartevents_filtered %>%
+  rename(subject_id = subject_id.x) %>%  # Keep one `subject_id`
+  select(-subject_id.y)  # Remove the duplicate column
+
+# Step 1: Identify ICU stays with at least one recorded measurement
+icu_patients_with_vitals <- chartevents_filtered %>%
+  select(subject_id, stay_id) %>%
+  distinct()
+
+# Step 2: Extract the first `storetime` per ICU stay
+first_storetime_per_stay <- chartevents_filtered %>%
+  group_by(stay_id) %>%
+  summarize(first_storetime = min(storetime, na.rm = TRUE), .groups = "drop")
+
+# Step 3: Keep all measurements recorded at the first `storetime` of each ICU stay
+chartevents_first_per_stay <- chartevents_filtered %>%
+  inner_join(first_storetime_per_stay, by = "stay_id") %>%
+  filter(storetime == first_storetime)
+
+# Step 4: Handle multiple vital measurements at the same `storetime` (take average)
+chartevents_avg <- chartevents_first_per_stay %>%
+  group_by(subject_id, stay_id, itemid) %>%
+  summarize(valuenum_avg = mean(valuenum, na.rm = TRUE), .groups = "drop")
+
+# Step 5: Reshape the data to have one row per ICU stay, keeping all items
+chartevents_tble <- chartevents_avg %>%
+  pivot_wider(names_from = itemid, values_from = valuenum_avg, names_prefix = "vital_")
+
+# Rename columns for clarity
+chartevents_tble <- chartevents_tble %>%
+  rename(
+    heart_rate = vital_220045,
+    non_invasive_bp_systolic = vital_220179,
+    non_invasive_bp_diastolic = vital_220180,
+    temperature_fahrenheit = vital_223761,
+    respiratory_rate = vital_220210
+  )
+
+# Ensure we include only subjects who have had at least one ICU stay with vitals
+chartevents_tble <- chartevents_tble %>%
+  semi_join(icu_patients_with_vitals, by = "stay_id")
+
+# Verify the number of rows
+cat("Number of rows in chartevents_tble:", nrow(chartevents_tble), "\n")  # Should be 94,363
+
+# Display the first few rows
+print(head(chartevents_tble, 10))
+
+
 ```
 
 

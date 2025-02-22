@@ -433,6 +433,10 @@ print(admissions_tble)
 
 ### Q3.2 Summary and visualization
 
+According to the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/about/concepts/#date-shifting), 
+
+> All dates in the database have been shifted to protect patient confidentiality. Dates will be internally consistent for the same patient, but randomly distributed in the future. Dates of birth which occur in the present time are not true dates of birth. Furthermore, dates of birth which occur before the year 1900 occur if the patient is older than 89. In these cases, the patient’s age at their first admission has been fixed to 300.
+
 Summarize the following information by graphics and explain any patterns you see.
 
 1. Number of admissions per patient 
@@ -445,8 +449,10 @@ admissions_summary <- admissions_tble %>%
   summarise(num_admissions = n(), .groups = 'drop')
 
 ggplot(admissions_summary, aes(x = num_admissions)) +
-  geom_histogram(binwidth = 0.5, fill = "steelblue", color = "black", alpha = 0.8) +  
-  scale_x_continuous(trans = "log1p", breaks = c(1, 2, 3, 5, 10, 15, 20, 30, 50, 100, 200)) +  
+  geom_histogram(binwidth = 0.4, fill = "steelblue", 
+                 color = "black", alpha = 0.8) +  
+  scale_x_continuous(trans = "log1p", 
+                     breaks = c(1, 2, 3, 5, 10, 15, 20, 30, 50, 100, 200)) +  
   labs(title = "Distribution of Admissions per Patient",
        x = "Number of Admissions (Log Scale)",
        y = "Number of Patients") +
@@ -482,7 +488,7 @@ admissions_tble <- admissions_tble %>%
 
 ggplot(admissions_tble, aes(x = admit_minute)) +
   geom_histogram(binwidth = 1, fill = "darkorange", color = "black", alpha = 0.8) +
-  scale_x_continuous(breaks = seq(0, 59, by = 5)) +  # Ensure visibility for all minutes
+  scale_x_continuous(breaks = seq(0, 59, by = 5)) + 
   labs(title = "Distribution of ICU Admissions by Minute",
        x = "Minute of Admission (0-59)",
        y = "Number of Admissions") +
@@ -491,14 +497,38 @@ ggplot(admissions_tble, aes(x = admit_minute)) +
 
 4. Length of hospital stay (from admission to discharge) (anything unusual?)  
 
-**Analysis** 
+**Analysis: ** 
+The histogram that evaluates the hospital length of stay distribution showcases a heavily right skewed distribution where most patients have very short hospital stays, with the highest frequency at 1 day. The majority of admissions are under 5 days and there is a sharp decline in the number of admissions as the length of stay increases. We are able to see that some patients have long hospitalizations (up to 50 days), but these cases are much fewer. The long tail suggests that a small subset of patients require extended hospital care. 
 
-The histogram visualizes the distribution of hospital length of stay, capped at 30 days.There is an unusually high number of 1-day stays, far exceeding other lengths, which may indicate short-term admissions, observation cases, or administrative coding practices. A notable concentration of patients at exactly 30 days suggests policy-driven discharge patterns or dataset truncation. The red density curve extends close to 30 days rather than sharply declining, indicating a subset of patients with prolonged hospitalizations, likely due to chronic conditions or severe cases.
+```{r}
+admissions_tble <- admissions_tble %>%
+  mutate(
+    admit_time = as.POSIXct(admittime, 
+                            format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
+    discharge_time = as.POSIXct(dischtime, 
+                                format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
+  ) %>%
+  mutate(LOS_days = as.numeric(
+    difftime(discharge_time, admit_time, units = "days")
+  ))
+
+admissions_tble <- admissions_tble %>%
+  filter(LOS_days >= 0, LOS_days < 365)  
+
+ggplot(admissions_tble, aes(x = LOS_days)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", 
+                 color = "black", alpha = 0.8) +
+  scale_x_continuous(
+    breaks = seq(0, 50, by = 5), 
+    limits = c(0, 50)  # Limit x-axis to 50 days
+  ) +
+  labs(title = "Distribution of Hospital Length of Stay",
+       x = "Length of Stay (Days)",
+       y = "Number of Admissions") +
+  theme_minimal()
+```
 
 
-According to the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/about/concepts/#date-shifting), 
-
-> All dates in the database have been shifted to protect patient confidentiality. Dates will be internally consistent for the same patient, but randomly distributed in the future. Dates of birth which occur in the present time are not true dates of birth. Furthermore, dates of birth which occur before the year 1900 occur if the patient is older than 89. In these cases, the patient’s age at their first admission has been fixed to 300.
 
 ## Q4. `patients` data
 
@@ -522,17 +552,30 @@ print(patients_tble)
 Summarize variables `gender` and `anchor_age` by graphics, and explain any patterns you see.
 
 **Summary Graph of Gender (genotypical sex of the patient): ** 
-The bar chart illustrates the gender distribution of patients, showing a slight female majority. While females are more frequent than males, the difference is not substantial, indicating a fairly balanced representation of both genders in the dataset.
+The bar chart illustrates the gender distribution of patients, showing a slight female majority. While females are more frequent than males, the difference is not substantial, indicating a fairly balanced representation of both genders in the dataset. More specifically, the number of females in the patients_tble is 191,984 and the number of males in the patients_tble is 172,643. 
 
 ```{r}
-# Bar Plot: Gender Distribution with Custom Colors
 ggplot(patients_tble, aes(x = gender, fill = gender)) +
-  geom_bar(color = "black", alpha = 0.8) +
-  scale_fill_manual(values = c("M" = "steelblue", "F" = "pink")) +  # Assign colors
-  labs(title = "Gender Distribution",
-       x = "Gender",
-       y = "Count of Patients") +
-  theme_minimal()
+  geom_bar(color = 'black', alpha = 0.8, width = 0.6) +  
+  scale_fill_manual(values = c("M" = "steelblue", "F" = "pink")) +  
+  labs(
+    title = "Gender Distribution of ICU Patients",
+    subtitle = "Comparing the number of male and female patients",
+    x = "Gender",
+    y = "Number of Patients",
+    fill = "Gender Category"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12, face = "italic"),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title = element_text(size = 14, face = "bold"),
+    legend.position = "right"
+  ) +
+  geom_text(stat = "count", aes(label = scales::comma(..count..)), 
+            vjust = -0.5, size = 5, fontface = "bold")
 ```
 
 **Summary Graph of Anchor_Age: ** 
@@ -542,7 +585,8 @@ Anchor_age represents a patient's age in the anchor_year. If a patient is over 8
 ```{r}
 # 2. Histogram: Age Distribution
 ggplot(patients_tble, aes(x = anchor_age)) +
-  geom_histogram(binwidth = 5, fill = "steelblue", color = "black", alpha = 0.8) +
+  geom_histogram(binwidth = 5, fill = "steelblue", 
+                 color = "black", alpha = 0.8) +
   labs(title = "Age Distribution of Patients",
        x = "Age (Years)",
        y = "Number of Patients") +
@@ -550,7 +594,8 @@ ggplot(patients_tble, aes(x = anchor_age)) +
 ```
 
 **Visualizing the 2 variables together: Gender and Anchor_Age: ** 
-The box plot visualizes the age distribution of patients by genders, females and males. The median age is nearly the same for both genders, suggesting no significiant 
+
+The box plot visualizes the age distribution of patients by genders, females and males. The median age for both genders appears to be similar, around the mid-50s. This suggests that the age demographics of male and female patients are comparable. The IQR (middle 50 percent of values) spans from approximately 30 to 70 years for both genders. This indicates that most ICU patients faill within this age range. There is no significant visual difference in the age disribution ebtween males and females which suggsts that both genders have a similar age profile in ICU admissions. 
 
 ```{r}
 # 3. Box Plot: Age by Gender
@@ -560,7 +605,7 @@ ggplot(patients_tble, aes(x = gender, y = anchor_age, fill = gender)) +
        x = "Gender",
        y = "Age (Years)") +
   theme_minimal() +
-  scale_fill_manual(values = c("blue", "pink"))  # Custom colors for M & F
+  scale_fill_manual(values = c("blue", "pink"))  
 ```
 
 ## Q5. Lab results
@@ -579,11 +624,6 @@ zcat < ~/mimic/hosp/d_labitems.csv.gz | head
 We are interested in the lab measurements of creatinine (50912), potassium (50971), sodium (50983), chloride (50902), bicarbonate (50882), hematocrit (51221), white blood cell count (51301), and glucose (50931). Retrieve a subset of `labevents.csv.gz` that only containing these items for the patients in `icustays_tble`. Further restrict to the last available measurement (by `storetime`) before the ICU stay. The final `labevents_tble` should have one row per ICU stay and columns for each lab measurement.
 
 ![](labevents_tble.png)
-We will use the Parquet format that I generated in Homework #2. For reproducibility, the labevents_pq folder is available at the current working directory by a symbolic link: 
-
-```{bash}
-ls -l ./labevents_pq
-```
 
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `labevents_pq` folder available at the current working directory `hw3`, for example, by a symbolic link.
 
@@ -656,7 +696,8 @@ zcat < ~/mimic/icu/d_items.csv.gz | head
 We are interested in the vitals for ICU patients: heart rate (220045), systolic non-invasive blood pressure (220179), diastolic non-invasive blood pressure (220180), body temperature in Fahrenheit (223761), and respiratory rate (220210). Retrieve a subset of `chartevents.csv.gz` only containing these items for the patients in `icustays_tble`. Further restrict to the first vital measurement within the ICU stay. The final `chartevents_tble` should have one row per ICU stay and columns for each vital measurement. 
 
 ![](chartevents_tble.png)
-**Solution ** It is important to note that I created a different chartevents_parquet file from the one in Homework #2. This is due to the fact that there is a dispreancy between the two homrwork (in homework #2, we collect data including mean non-invasive blood pressure: 220181 while in homework #3, we collect data including diastolic non-invasive blood pressure  220180). Presented below is the chartevents_pq file that includes information regarding diastolic non-invasive blood pressure (220180). 
+
+**Solution ** Note that the subset_chartevents contains information regarding diastolic non-invasive blood pressure 220180 and not 220181 (from last homework). 
 
 ```{r}
 subset_chartevents <- subset_chartevents %>%
@@ -748,7 +789,6 @@ icustays_tble <- icustays_tble %>%
 
 ```
 
-
 ```{r}
 icustays_filtered <- icustays_tble %>%
   inner_join(
@@ -775,11 +815,11 @@ icu_final <- icu_vitals %>%
   left_join(labevents_tble, by = c("subject_id", "stay_id"))
 
 mimic_icu_cohort <- icu_final %>%
+  select(-LOS_days, -admit_time, -discharge_time) %>%  # Exclude unwanted columns
   arrange(subject_id, hadm_id, stay_id) %>%
   distinct()
 
 print(mimic_icu_cohort)
-colnames(mimic_icu_cohort)
 ```
 
 ## Q8. Exploratory data analysis (EDA)
@@ -844,23 +884,32 @@ cat(paste0("Max: ", age_intime_summary$age_max, "\n"))
 
 ```
 
-1. Boxplot of LOS versus Race: 
+1. Boxplot of LOS (Length of ICU Stay) versus Race: 
+
+We evaluate the relationship length of stay for the patients for the given ICU stay and race through multiple histograms. We are able to see that most racial groups have a median ICU stay of a few days, indicating that ICU stays are typically short for the majority of patients. There are many outliers across all racial groups, with some patients staying over 40 days. Certain groups, such as "White - Eastern European" and "Other" appear to have wider range of ICU stays. Groups like "Hispanic/Latino - Central American" and "Black/African American" show slightly higher variability compared to others. The N/A category (potentally missing race data) has a significant spread, which may indicate data inconsistentices. The distribution suggests most ICU stays are short, but a small subset of patients experience prolonged ICU admissions. Note that we limited the y-axis to 40 days (length of stay) for better readability of the graph. 
 
 ```{r}
 # Boxplot: LOS vs Race
 ggplot(mimic_icu_cohort, aes(x = race, y = los, fill = race)) +
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title = "Length of ICU Stay vs Race", x = "Race", y = "Length of Stay (Days)")
+  labs(title = "Length of ICU Stay vs Race", 
+       x = "Race", 
+       y = "Length of Stay (Days)") +
+  coord_cartesian(ylim = c(0, 40))  
 ```
 
 2. Boxplot of LOS versus Insurance 
 
 ```{r}
-ggplot(mimic_icu_cohort, aes(x = insurance, y = los, fill = insurance)) +
+ggplot(mimic_icu_cohort %>% filter(!is.na(insurance)), 
+       aes(x = insurance, y = los, fill = insurance)) +
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title = "Length of ICU Stay vs Insurance", x = "Insurance Type", y = "Length of Stay (Days)")
+  labs(title = "Length of ICU Stay vs Insurance", 
+       x = "Insurance Type", 
+       y = "Length of Stay (Days)") +
+  coord_cartesian(ylim = c(0, 25))  
 ```
 
 
@@ -975,6 +1024,7 @@ p <- ggplot(mimic_long, aes(
 print(p)
 
 ```
+
 **Length of ICU stay los vs the first vital measurements within the ICU stay** 
 
 The median values for each vital sign remain relatively stable across Length of ICU Stay (LOS) categories (<1 Day, 1-3 Days, 3-7 Days, >7 Days). This suggests that initial vital signs at ICU admission may not be strong predictors of ICU stay length. Heart Rate: Shows moderate variability, with higher outliers exceeding 120 bpm, but the overall distribution remains consistent across LOS groups. Non-Invasive Blood Pressure (Systolic & Diastolic): Both exhibit a consistent range, though some extreme outliers exist at the higher end. Respiratory Rate: Displays a wider interquartile range (IQR) compared to other vital signs, but no clear trend is observed across LOS categories. Temperature (Fahrenheit): Has a tight distribution around 98-99°F, with minimal variability and a few outliers. The boxplots emphasize the interquartile range (IQR) while removing extreme outliers for better visualization. Moderate outliers are still included to provide a realistic view of variability within each vital sign.
@@ -1042,8 +1092,16 @@ p <- ggplot(mimic_long, aes(
   theme(
     legend.position = "bottom",
     legend.text = element_text(size = 10),
-    legend.title = element_text(size = 12, face = 
+    legend.title = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12, face = "italic"),
+    strip.text = element_text(size = 12, face = "bold")
+  )
 
+print(p)
 ```
 
 **Length of ICU stay los vs first ICU unit ** 
@@ -1054,7 +1112,6 @@ The median LOS varies significantly across different ICU Units. Surgical and spe
 mimic_icu_cohort$first_careunit <- str_wrap(
   mimic_icu_cohort$first_careunit, width = 15
 )
-
 icu_unit_summary <- mimic_icu_cohort %>%
   group_by(first_careunit) %>%
   summarise(
@@ -1065,15 +1122,13 @@ icu_unit_summary <- mimic_icu_cohort %>%
     los_max = max(los, na.rm = TRUE),
     count = n()
   ) %>%
-  arrange(desc(los_median))  # Sort by median LOS
+  arrange(desc(los_median))  
 
-# Reorder ICU units by median LOS
 mimic_icu_cohort <- mimic_icu_cohort %>%
   mutate(first_careunit = reorder(
     first_careunit, los, FUN = median, na.rm = TRUE
   ))
 
-# Boxplot with Improved Readability
 ggplot(mimic_icu_cohort, aes(
   x = first_careunit, y = los, fill = first_careunit
 )) +
@@ -1090,16 +1145,13 @@ ggplot(mimic_icu_cohort, aes(
     legend.position = "none",
     axis.text.x = element_text(
       angle = 90, hjust = 1, vjust = 0.5, size = 10
-    ),  # Rotate X labels
+    ),  
     axis.text.y = element_text(size = 10),
     axis.title = element_text(size = 12, face = "bold"),
     plot.title = element_text(size = 16, face = "bold"),
     plot.subtitle = element_text(size = 12, face = "italic")
   )
 
-# Perform ANOVA test
-anova_result <- aov(los ~ first_careunit, data = mimic_icu_cohort)
-summary(anova_result)
 
 # Perform Kruskal-Wallis test (non-parametric alternative)
 kruskal_test <- kruskal.test(los ~ first_careunit, data = mimic_icu_cohort)
@@ -1107,9 +1159,7 @@ print(kruskal_test)
 
 ```
 
-
-
-
+End of Homework #3 
 
 
 

@@ -50,13 +50,7 @@ Do a similar visualization for the patient with `subject_id` 10063848 using ggpl
 Hint: We need to pull information from data files `patients.csv.gz`, `admissions.csv.gz`, `transfers.csv.gz`, `labevents.csv.gz`, `procedures_icd.csv.gz`, `diagnoses_icd.csv.gz`, `d_icd_procedures.csv.gz`, and `d_icd_diagnoses.csv.gz`. For the big file `labevents.csv.gz`, use the Parquet format you generated in Homework 2. For reproducibility, make the Parquet folder `labevents_pq` available at the current working directory `hw3`, for example, by a symbolic link. Make your code reproducible.
 
 ```{bash}
-ln -s ~/biostat-203b-2025-winter/hw2/labevents_parquet ./labevents_pq
 ls -l ./labevents_pq
-```
-
-
-```{bash}
-ln -s ~/biostat-203b-2025-winter/hw2/chartevents_parquet ./chartevents_pq
 ```
 
 ```{bash}
@@ -248,17 +242,14 @@ print(head(subset_chartevents , 10))
 dbDisconnect(duckdb_conn)
 ```
 
-```{r}
-d_items <- read_csv("~/mimic/icu/d_items.csv.gz")
-subset_chartevents 
-d_items
-icustays_tble
-```
-
-code for the graph 1.2
 
 ```{r}
 icustays_tble <- read_csv("~/mimic/icu/icustays.csv.gz")
+d_items <- read_csv("~/mimic/icu/d_items.csv.gz") 
+```
+
+
+```{r}
 subject_id_of_interest <- 10063848
 
 subject_stays <- icustays_tble %>%
@@ -526,21 +517,6 @@ ggplot(admissions_tble, aes(x = admit_minute)) +
 
 The histogram visualizes the distribution of hospital length of stay, capped at 30 days.There is an unusually high number of 1-day stays, far exceeding other lengths, which may indicate short-term admissions, observation cases, or administrative coding practices. A notable concentration of patients at exactly 30 days suggests policy-driven discharge patterns or dataset truncation. The red density curve extends close to 30 days rather than sharply declining, indicating a subset of patients with prolonged hospitalizations, likely due to chronic conditions or severe cases.
 
-```{r}
-# Focus on hospital stays of 30 days or less
-short_stays <- admissions_tble %>%
-  filter(length_of_stay <= 30)
-
-# Refined histogram with density overlay
-ggplot(short_stays, aes(x = length_of_stay)) +
-  geom_histogram(binwidth = 1, fill = "steelblue", color = "black", alpha = 0.8) +
-  geom_density(color = "red", size = 1, alpha = 0.6) +
-  scale_x_continuous(breaks = seq(0, 30, by = 5)) +
-  labs(title = "Distribution of Hospital Length of Stay (≤ 30 Days)",
-       x = "Length of Stay (Days)",
-       y = "Number of Patients") +
-  theme_minimal()
-```
 
 According to the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/about/concepts/#date-shifting), 
 
@@ -773,14 +749,36 @@ The final `mimic_icu_cohort` should have one row per ICU stay and columns for ea
 ![](mimic_icu_cohort.png)
 
 ```{r}
+# Create a copy of intime_year separately without modifying icustays_tble
+icustays_age <- icustays_tble %>%
+  mutate(intime_year = year(as.Date(intime)))  # Extract year without modifying intime
+
+# Compute age_at_intime
+age_at_intime <- icustays_age %>%
+  left_join(patients_tble %>% select(subject_id, anchor_age, anchor_year), by = "subject_id") %>%
+  mutate(age_at_intime = anchor_age + (intime_year - anchor_year)) %>%
+  select(subject_id, stay_id, age_at_intime)  # Keep only required columns
+
+# Merge age_at_intime back into icustays_tble (without changing intime or other columns)
+icustays_tble <- icustays_tble %>%
+  left_join(age_at_intime, by = c("subject_id", "stay_id"))
+
+```
+
+
+```{r}
 # Step 1: Filter icustays_tble for adult ICU stays (intime >= 18 years old)
 icustays_filtered <- icustays_tble %>%
-  inner_join(patients_tble %>% select(subject_id, anchor_age), by = "subject_id") %>%
+  inner_join(patients_tble %>% 
+               select(subject_id, anchor_age, anchor_year, anchor_year_group, dod, gender), 
+             by = "subject_id") %>%
   filter(anchor_age >= 18)
 
-# Step 2: Merge icustays with admissions table
+# Step 2: Merge icustays with admissions table (excluding admit_hour & admit_minute)
 icu_admissions <- icustays_filtered %>%
-  left_join(admissions_tble, by = c("subject_id", "hadm_id"))
+  left_join(admissions_tble %>%
+              select(-admit_hour, -admit_minute),  # Exclude these columns
+            by = c("subject_id", "hadm_id"))
 
 # Step 3: Merge with first vital measurements from chartevents_tble
 icu_vitals <- icu_admissions %>%
@@ -797,26 +795,7 @@ mimic_icu_cohort <- icu_final %>%
 
 # Step 6: Print final dataset
 print(mimic_icu_cohort)
-
-# List of expected columns
-expected_columns <- c("subject_id", "hadm_id", "stay_id", "first_careunit", "last_careunit",
-                      "intime", "outtime", "los", "admittime", "dischtime", "deathtime",
-                      "admission_type", "admit_provider_id", "admission_location", "discharge_location",
-                      "insurance", "language", "marital_status", "race", "anchor_age", "anchor_year",
-                      "anchor_year_group", "dod", "bicarbonate", "chloride", "creatinine", "glucose",
-                      "potassium", "sodium", "hematocrit", "wbc", "heart_rate",
-                      "non_invasive_blood_pressure_systolic", "non_invasive_blood_pressure_diastolic",
-                      "respiratory_rate", "temperature_fahrenheit")
-
-# Get actual columns in mimic_icu_cohort
-actual_columns <- colnames(mimic_icu_cohort)
-
-# Find missing columns
-missing_columns <- setdiff(expected_columns, actual_columns)
-
-# Print missing columns
-print(missing_columns)
-
+colnames(mimic_icu_cohort)
 ```
 
 
@@ -824,32 +803,260 @@ print(missing_columns)
 
 Summarize the following information about the ICU stay cohort `mimic_icu_cohort` using appropriate numerics or graphs:
 
-- Length of ICU stay `los` vs demographic variables (race, insurance, marital_status, gender, age at intime)
+**Length of ICU stay `los` vs demographic variables (race, insurance, marital_status, gender, age at intime) ** 
+
+The summary statistics for the individual variables los, race, insurance, martial_status, gender, and age at intime are stated below: 
 
 ```{r}
+# Summary statistics for individual variables
+summary_stats <- mimic_icu_cohort %>%
+  summarise(
+    los_mean = mean(los, na.rm = TRUE),
+    los_median = median(los, na.rm = TRUE),
+    los_sd = sd(los, na.rm = TRUE),
+    los_min = min(los, na.rm = TRUE),
+    los_max = max(los, na.rm = TRUE)
+  )
+
+# Summary of categorical variables
+categorical_summary <- mimic_icu_cohort %>%
+  summarise(
+    race_levels = n_distinct(race),
+    insurance_levels = n_distinct(insurance),
+    marital_status_levels = n_distinct(marital_status),
+    gender_levels = n_distinct(gender)
+  )
+
+# Summary of numerical variable (Age at ICU admission)
+age_intime_summary <- mimic_icu_cohort %>%
+  summarise(
+    age_mean = mean(age_at_intime, na.rm = TRUE),
+    age_median = median(age_at_intime, na.rm = TRUE),
+    age_sd = sd(age_at_intime, na.rm = TRUE),
+    age_min = min(age_at_intime, na.rm = TRUE),
+    age_max = max(age_at_intime, na.rm = TRUE)
+  )
+
+# Display all summaries in a readable format
+cat("\n===== Length of ICU Stay (LOS) Summary =====\n")
+cat(paste0("Mean: ", summary_stats$los_mean, "\n"))
+cat(paste0("Median: ", summary_stats$los_median, "\n"))
+cat(paste0("Standard Deviation: ", summary_stats$los_sd, "\n"))
+cat(paste0("Min: ", summary_stats$los_min, "\n"))
+cat(paste0("Max: ", summary_stats$los_max, "\n"))
+
+cat("\n===== Categorical Variables Summary =====\n")
+cat(paste0("Number of Race Categories: ", categorical_summary$race_levels, "\n"))
+cat(paste0("Number of Insurance Types: ", categorical_summary$insurance_levels, "\n"))
+cat(paste0("Number of Marital Status Levels: ", categorical_summary$marital_status_levels, "\n"))
+cat(paste0("Number of Gender Levels: ", categorical_summary$gender_levels, "\n"))
+
+cat("\n===== Age at Intime Summary =====\n")
+cat(paste0("Mean: ", age_intime_summary$age_mean, "\n"))
+cat(paste0("Median: ", age_intime_summary$age_median, "\n"))
+cat(paste0("Standard Deviation: ", age_intime_summary$age_sd, "\n"))
+cat(paste0("Min: ", age_intime_summary$age_min, "\n"))
+cat(paste0("Max: ", age_intime_summary$age_max, "\n"))
+```
+1. Boxplot of LOS versus Race: 
+
+```{r}
+# Boxplot: LOS vs Race
+ggplot(mimic_icu_cohort, aes(x = race, y = los, fill = race)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Length of ICU Stay vs Race", x = "Race", y = "Length of Stay (Days)")
+```
+
+2. Boxplot of LOS versus Insurance 
+
+```{r}
+ggplot(mimic_icu_cohort, aes(x = insurance, y = los, fill = insurance)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Length of ICU Stay vs Insurance", x = "Insurance Type", y = "Length of Stay (Days)")
+```
+
+
+3. Boxplot of LOS versus Martial Status 
+
+```{r}
+ggplot(mimic_icu_cohort, aes(x = marital_status, y = los, fill = marital_status)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Length of ICU Stay vs Marital Status", x = "Marital Status", y = "Length of Stay (Days)")
+```
+
+4. Boxplot of LOS versus Gender 
+```{r}
+# Boxplot: LOS vs Gender
+ggplot(mimic_icu_cohort, aes(x = gender, y = los, fill = gender)) +
+  geom_boxplot() +
+  labs(title = "Length of ICU Stay vs Gender", x = "Gender", y = "Length of Stay (Days)")
+```
+
+5. Boplot of LOS versus Age in Time 
+```{r}
+# Scatter plot: LOS vs Age at ICU Admission
+ggplot(mimic_icu_cohort, aes(x = age_at_intime, y = los)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", col = "blue") +
+  labs(title = "Length of ICU Stay vs Age", x = "Age at ICU Admission", y = "Length of Stay (Days)")
+```
+
+
+**Length of ICU stay los vs the last available lab measurements before ICU stay **
+
+```{r}
+library(corrplot)
+# Select lab measurement columns
+lab_vars <- c("bicarbonate", "chloride", "creatinine", "glucose", "potassium", 
+              "sodium", "hematocrit", "wbc")
+
+# Summary statistics for LOS and Lab Variables
+lab_summary <- mimic_icu_cohort %>%
+  summarise(across(all_of(lab_vars), 
+                   list(mean = ~mean(.x, na.rm = TRUE),
+                        median = ~median(.x, na.rm = TRUE),
+                        min = ~min(.x, na.rm = TRUE),
+                        max = ~max(.x, na.rm = TRUE),
+                        sd = ~sd(.x, na.rm = TRUE))))
+
+# Print Lab Summary
+print(lab_summary)
+
+# Boxplots: Categorizing LOS for Better Visualization
+mimic_icu_cohort <- mimic_icu_cohort %>%
+  mutate(los_category = case_when(
+    los < 1 ~ "< 1 Day",
+    los >= 1 & los <= 3 ~ "1-3 Days",
+    los > 3 & los <= 7 ~ "3-7 Days",
+    los > 7 ~ "> 7 Days"
+  ))
+
+for (var in lab_vars) {
+  print(
+    ggplot(mimic_icu_cohort, aes_string(x = "los_category", y = var, fill = "los_category")) +
+      geom_boxplot() +
+      theme_minimal() +
+      labs(title = paste("Boxplot of", var, "by LOS Category"), x = "LOS Category", y = var)
+  )
+}
+```
+
+
+
+**Length of ICU stay los vs the first vital measurements within the ICU stay** 
+
+The median values for each vital sign remain relatively stable across Length of ICU Stay (LOS) categories (<1 Day, 1-3 Days, 3-7 Days, >7 Days). This suggests that initial vital signs at ICU admission may not be strong predictors of ICU stay length. Heart Rate: Shows moderate variability, with higher outliers exceeding 120 bpm, but the overall distribution remains consistent across LOS groups. Non-Invasive Blood Pressure (Systolic & Diastolic): Both exhibit a consistent range, though some extreme outliers exist at the higher end. Respiratory Rate: Displays a wider interquartile range (IQR) compared to other vital signs, but no clear trend is observed across LOS categories. Temperature (Fahrenheit): Has a tight distribution around 98-99°F, with minimal variability and a few outliers. The boxplots emphasize the interquartile range (IQR) while removing extreme outliers for better visualization. Moderate outliers are still included to provide a realistic view of variability within each vital sign.
+
+```{r}
+vital_vars <- c("heart_rate", 
+                "non_invasive_blood_pressure_systolic", 
+                "non_invasive_blood_pressure_diastolic", 
+                "respiratory_rate", 
+                "temperature_fahrenheit")
+
+# Categorizing LOS for Better Visualization
+mimic_icu_cohort <- mimic_icu_cohort %>%
+  mutate(los_category = factor(case_when(
+    los < 1 ~ "< 1 Day",
+    los >= 1 & los <= 3 ~ "1-3 Days",
+    los > 3 & los <= 7 ~ "3-7 Days",
+    los > 7 ~ "> 7 Days"
+  ), levels = c("< 1 Day", "1-3 Days", "3-7 Days", "> 7 Days")))
+
+# Convert Data to Long Format for Faceted Boxplots
+mimic_long <- mimic_icu_cohort %>%
+  select(los_category, all_of(vital_vars)) %>%
+  pivot_longer(cols = all_of(vital_vars), names_to = "Vital_Sign", values_to = "Value")
+
+# Compute IQR for each vital sign to filter extreme outliers
+iqr_stats <- mimic_long %>%
+  group_by(Vital_Sign) %>%
+  summarise(Q1 = quantile(Value, 0.25, na.rm = TRUE),
+            Q3 = quantile(Value, 0.75, na.rm = TRUE),
+            IQR = Q3 - Q1,
+            y_min = Q1 - 1.5 * IQR,
+            y_max = Q3 + 1.5 * IQR)
+
+# Join IQR stats to filter extreme outliers
+mimic_long <- mimic_long %>%
+  left_join(iqr_stats, by = "Vital_Sign") %>%
+  filter(Value >= y_min & Value <= y_max)  # Keep only moderate outliers
+
+# Define colors for each vital sign
+vital_colors <- c("heart_rate" = "#E74C3C",
+                  "non_invasive_blood_pressure_systolic" = "#27AE60",
+                  "non_invasive_blood_pressure_diastolic" = "#F1C40F",
+                  "respiratory_rate" = "#2980B9",
+                  "temperature_fahrenheit" = "#9B59B6")
+
+# Create a single faceted boxplot
+p <- ggplot(mimic_long, aes(x = los_category, y = Value, fill = Vital_Sign)) +
+  geom_boxplot(outlier.size = 1, outlier.alpha = 0.6, width = 0.6) +  # Adjust width
+  stat_summary(fun = median, geom = "point", size = 3, color = "black", shape = 18) +  # Highlight Median
+  scale_fill_manual(values = vital_colors) +  # Set custom colors
+  theme_minimal() +
+  labs(title = "Boxplot of Vital Signs by LOS Category",
+       subtitle = "Focusing on Median, IQR, and Moderate Outliers",
+       x = "Length of ICU Stay (LOS) Category", 
+       y = "Vital Sign Value",
+       fill = "Vital Sign") +
+  facet_wrap(~ Vital_Sign, scales = "free_y", nrow = 2) +  # Arrange in 2 rows
+  theme(legend.position = "bottom", 
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 12, face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        axis.text.y = element_text(size = 10),
+        axis.title = element_text(size = 12, face = "bold"),
+        plot.title = element_text(size = 16, face = "bold"),
+        plot.subtitle = element_text(size = 12, face = "italic"),
+        strip.text = element_text(size = 12, face = "bold"))  # Improve facet titles
+
+# Print the refined plot
+print(p)
 
 ```
 
 
-- Length of ICU stay `los` vs the last available lab measurements before ICU stay
+**Length of ICU stay los vs first ICU unit ** 
 ```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+
+# Summary statistics for LOS by first ICU unit
+icu_unit_summary <- mimic_icu_cohort %>%
+  group_by(first_careunit) %>%
+  summarise(
+    los_mean = mean(los, na.rm = TRUE),
+    los_median = median(los, na.rm = TRUE),
+    los_sd = sd(los, na.rm = TRUE),
+    los_min = min(los, na.rm = TRUE),
+    los_max = max(los, na.rm = TRUE),
+    count = n()
+  ) %>%
+  arrange(desc(los_mean)) # Sort by mean LOS
+
+# Print ICU Unit Summary
+print(icu_unit_summary)
+
+# Boxplot: LOS vs First ICU Unit
+ggplot(mimic_icu_cohort, aes(x = first_careunit, y = los, fill = first_careunit)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Length of ICU Stay vs First ICU Unit", x = "First ICU Unit", y = "LOS (days)")
+
+# Perform ANOVA test to check if LOS differs across ICU units
+anova_result <- aov(los ~ first_careunit, data = mimic_icu_cohort)
+summary(anova_result)
+
+# If LOS distribution is not normal, use Kruskal-Wallis test (non-parametric)
+kruskal_test <- kruskal.test(los ~ first_careunit, data = mimic_icu_cohort)
+print(kruskal_test)
 
 ```
-
-
-- Length of ICU stay `los` vs the first vital measurements within the ICU stay
-
-
-- Length of ICU stay `los` vs first ICU unit
-
-
-```{r}
-
-```
-
-
-
-
 
 
 

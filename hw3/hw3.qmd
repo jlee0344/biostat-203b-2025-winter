@@ -702,59 +702,6 @@ We are interested in the vitals for ICU patients: heart rate (220045), systolic 
 ![](chartevents_tble.png)
 **Solution ** It is important to note that I created a different chartevents_parquet file from the one in Homework #2. This is due to the fact that there is a dispreancy between the two homrwork (in homework #2, we collect data including mean non-invasive blood pressure: 220181 while in homework #3, we collect data including diastolic non-invasive blood pressure  220180). Presented below is the chartevents_pq file that includes information regarding diastolic non-invasive blood pressure (220180). 
 
-#Delete later: The datasets that I used: 
-
-```{r} 
-icustays_tble
-subset_chartevents 
-d_items
-```
-
-
-Code for question 6: I didn't get the right output for temperature_farenheit 
-
-Checking subset_chartevents for valuenum for temeprature: 
-
-```{r}
-subset_temperature <- chartevents_filtered%>%
-  filter(itemid == 223761) %>%
-  arrange(subject_id, stay_id)
-subset_temperature
-```
-
-
-```{r}
-# Filter for item_id = 223761 and arrange by subject_id, stay_id
-subset_temperature <- chartevents_first_per_stay %>%
-  arrange(subject_id, stay_id)
-
-subset_temperature 
-```
-
-```{r}
-parquet_file <- "chartevents_pq/part-0.parquet"
-start_time <- Sys.time()
-arrow_data <- open_dataset(parquet_file, format = "parquet")
-duckdb_conn <- dbConnect(duckdb::duckdb())
-
-invisible(to_duckdb(
-  .data = arrow_data,
-  con = duckdb_conn,
-  table_name = "chartevents",
-  auto_disconnect = FALSE
-))  
-
-subset_chartevents <- tbl(duckdb_conn, "chartevents") %>%
-  filter(itemid %in% c(220045, 220179, 220180, 223761, 220210)) %>%
-  arrange(subject_id, charttime, itemid,) %>% 
-  collect()
-
-cat("Number of rows in the result:", nrow(subset_chartevents ), "\n")
-print(head(subset_chartevents , 10)) 
-dbDisconnect(duckdb_conn)
-```
-
-DEBUG
 ```{r}
 subset_chartevents <- subset_chartevents %>%
   # Filtering from the start
@@ -770,10 +717,7 @@ chartevents_filtered <- subset_chartevents %>%
 chartevents_filtered <- chartevents_filtered %>%
   rename(subject_id = subject_id.x) %>%
   select(-subject_id.y)
-```
 
-
-```{r}
 # Extract the first storetime per subject_id, stay_id, and itemid
 first_store_per_stay <- chartevents_filtered %>%
   group_by(subject_id, stay_id, itemid) %>%  # Group by subject, stay, and item
@@ -781,10 +725,6 @@ first_store_per_stay <- chartevents_filtered %>%
   slice_min(order_by = storetime, n = 1) %>%  # Select the first storetime per stay and item
   ungroup()
 
-```
-
-
-```{r}
 # Step 2: Join back and remove storetime after selection
 chartevents_filtered <- chartevents_filtered %>%
   inner_join(first_store_per_stay %>% select(subject_id, stay_id, itemid, storetime),
@@ -798,11 +738,11 @@ chartevents_filtered <- chartevents_filtered %>%
   ungroup()
 
 # Step 4: Convert long format to wide format to get one row per stay_id
-chartevents_table <- chartevents_filtered %>%
+chartevents_tble <- chartevents_filtered %>%
   pivot_wider(names_from = itemid, values_from = valuenum_avg, names_prefix = "vital_")
 
 # Step 5: Rename columns for better readability
-chartevents_table <- chartevents_table %>%
+chartevents_tble <- chartevents_tble %>%
   rename(
     heart_rate = vital_220045,
     non_invasive_blood_pressure_systolic = vital_220179,
@@ -813,80 +753,8 @@ chartevents_table <- chartevents_table %>%
   arrange(subject_id, stay_id)
 
 # Step 6: Print final dataset
-print(chartevents_table)
-
-
+print(chartevents_tble)
 ```
-
-
-
-
-
-
-
-
-final code? 
-```{r} 
-subset_chartevents <- subset_chartevents %>%
-  mutate(
-    storetime = as.POSIXct(storetime, format="%Y-%m-%d %H:%M:%S", tz="UTC"),
-    charttime = as.POSIXct(charttime, format="%Y-%m-%d %H:%M:%S", tz="UTC")
-  )
-
-chartevents_filtered <- subset_chartevents %>%
-  inner_join(icustays_tble, by = "stay_id") %>%
-  filter(storetime >= intime & storetime < outtime)
-
-chartevents_filtered <- chartevents_filtered %>%
-  rename(subject_id = subject_id.x) %>%
-  select(-subject_id.y)
-
-first_store_per_stay <- chartevents_filtered %>%
-  group_by(stay_id) %>%
-  arrange(storetime) %>%
-  slice_min(order_by = storetime, n = 1) %>%
-  ungroup()
-
-chartevents_filtered <- chartevents_filtered %>%
-  inner_join(first_store_per_stay %>% select(stay_id, storetime),
-             by = c("stay_id", "storetime"))
-
-chartevents_filtered <- chartevents_filtered %>%
-  group_by(subject_id, stay_id, storetime, itemid) %>%
-  summarize(valuenum_avg = mean(valuenum, na.rm = TRUE), .groups = "drop") %>%
-  ungroup()
-
-chartevents_table <- chartevents_filtered %>%
-  pivot_wider(names_from = itemid, values_from = valuenum_avg, names_prefix = "vital_")
-
-chartevents_table <- chartevents_table %>%
-  rename(
-    heart_rate = vital_220045,
-    non_invasive_blood_pressure_systolic = vital_220179,
-    non_invasive_blood_pressure_diastolic = vital_220180,
-    temperature_fahrenheit = vital_223761,
-    respiratory_rate = vital_220210
-  )
-
-chartevents_table <- chartevents_table %>%
-  arrange(subject_id, stay_id)
-
-print(chartevents_table)
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Hint: Use the Parquet format you generated in Homework 2. For reproducibility, make `chartevents_pq` folder available at the current working directory, for example, by a symbolic link.
 
@@ -905,58 +773,49 @@ The final `mimic_icu_cohort` should have one row per ICU stay and columns for ea
 ![](mimic_icu_cohort.png)
 
 ```{r}
-# Read the necessary data files
-icustays_tble <- read_csv("~/mimic/icu/icustays.csv.gz")
-admissions_tble <- read_csv("~/mimic/hosp/admissions.csv.gz")
-patients_tble <- read_csv("~/mimic/hosp/patients.csv.gz")
-labevents_tble <- read_parquet("./final_labevents.parquet")  # Preprocessed last lab values
-chartevents_tble <- read_parquet("./chartevents_pq/part-0.parquet")  # First vitals
+# Step 1: Filter icustays_tble for adult ICU stays (intime >= 18 years old)
+icustays_filtered <- icustays_tble %>%
+  inner_join(patients_tble %>% select(subject_id, anchor_age), by = "subject_id") %>%
+  filter(anchor_age >= 18)
 
-# Convert timestamps to POSIXct for proper filtering
-icustays_tble <- icustays_tble %>%
-  mutate(intime = ymd_hms(intime), outtime = ymd_hms(outtime))
-
-admissions_tble <- admissions_tble %>%
-  mutate(admittime = ymd_hms(admittime), dischtime = ymd_hms(dischtime))
-
-patients_tble <- patients_tble %>%
-  mutate(dod = ymd(dod))  # Convert date of death
-
-# Filter ICU stays for adults (age >= 18 at intime)
-mimic_icu_cohort <- icustays_tble %>%
-  inner_join(patients_tble, by = "subject_id") %>%
-  filter(anchor_age >= 18)  # Keep only adult patients
-
-# Merge ICU stays with hospital admissions
-mimic_icu_cohort <- mimic_icu_cohort %>%
+# Step 2: Merge icustays with admissions table
+icu_admissions <- icustays_filtered %>%
   left_join(admissions_tble, by = c("subject_id", "hadm_id"))
 
-# Merge with last lab values before ICU admission
-mimic_icu_cohort <- mimic_icu_cohort %>%
+# Step 3: Merge with first vital measurements from chartevents_tble
+icu_vitals <- icu_admissions %>%
+  left_join(chartevents_tble, by = c("subject_id", "stay_id"))
+
+# Step 4: Merge with last lab measurements before ICU stay
+icu_final <- icu_vitals %>%
   left_join(labevents_tble, by = c("subject_id", "stay_id"))
 
-# Extract the first available vitals during ICU stay
-chartevents_first_vitals <- chartevents_tble %>%
-  filter(charttime >= intime) %>%  # Get vitals recorded after ICU admission
-  group_by(stay_id, subject_id, itemid) %>%
-  slice_min(order_by = charttime, n = 1) %>%  # Keep the first measurement
-  ungroup() %>%
-  select(subject_id, stay_id, itemid, value) %>%
-  pivot_wider(names_from = itemid, values_from = value)
+# Step 5: Ensure final cohort contains one row per ICU stay
+mimic_icu_cohort <- icu_final %>%
+  arrange(subject_id, hadm_id, stay_id) %>%
+  distinct()
 
-# Merge with first vitals
-mimic_icu_cohort <- mimic_icu_cohort %>%
-  left_join(chartevents_first_vitals, by = c("subject_id", "stay_id"))
+# Step 6: Print final dataset
+print(mimic_icu_cohort)
 
-# Arrange for better readability
-mimic_icu_cohort <- mimic_icu_cohort %>%
-  arrange(subject_id, stay_id)
+# List of expected columns
+expected_columns <- c("subject_id", "hadm_id", "stay_id", "first_careunit", "last_careunit",
+                      "intime", "outtime", "los", "admittime", "dischtime", "deathtime",
+                      "admission_type", "admit_provider_id", "admission_location", "discharge_location",
+                      "insurance", "language", "marital_status", "race", "anchor_age", "anchor_year",
+                      "anchor_year_group", "dod", "bicarbonate", "chloride", "creatinine", "glucose",
+                      "potassium", "sodium", "hematocrit", "wbc", "heart_rate",
+                      "non_invasive_blood_pressure_systolic", "non_invasive_blood_pressure_diastolic",
+                      "respiratory_rate", "temperature_fahrenheit")
 
-# Save the final cohort
-write_parquet(mimic_icu_cohort, "./mimic_icu_cohort.parquet")
+# Get actual columns in mimic_icu_cohort
+actual_columns <- colnames(mimic_icu_cohort)
 
-# Display the first few rows
-print(head(mimic_icu_cohort))
+# Find missing columns
+missing_columns <- setdiff(expected_columns, actual_columns)
+
+# Print missing columns
+print(missing_columns)
 
 ```
 

@@ -51,10 +51,12 @@ Hint: We need to pull information from data files `patients.csv.gz`, `admissions
 
 
 ```{r}
+system("ls -ld ./labevents_pq")
+
 patient_data <- read_csv("~/mimic/hosp/patients.csv.gz")
 hospital_admissions <- read_csv("~/mimic/hosp/admissions.csv.gz")
 patient_transfers <- read_csv("~/mimic/hosp/transfers.csv.gz")
-lab_results <- read_parquet("labevents_pq/part-0.parquet")
+lab_results <- read_parquet("./labevents_pq/part-0.parquet")
 medical_procedures <- read_csv("~/mimic/hosp/procedures_icd.csv.gz")
 patient_diagnoses <- read_csv("~/mimic/hosp/diagnoses_icd.csv.gz")
 procedure_codes <- read_csv("~/mimic/hosp/d_icd_procedures.csv.gz")
@@ -211,7 +213,7 @@ Do a similar visualization for the patient `10063848`.
 
 
 ```{r}
-parquet_file <- "chartevents_pq/part-0.parquet"
+parquet_file <- "./chartevents_pq/part-0.parquet"
 start_time <- Sys.time()
 arrow_data <- open_dataset(parquet_file, format = "parquet")
 duckdb_conn <- dbConnect(duckdb::duckdb())
@@ -229,6 +231,7 @@ subset_chartevents <- tbl(duckdb_conn, "chartevents") %>%
 
 dbDisconnect(duckdb_conn)
 ```
+
 
 ```{r}
 icustays_tble <- read_csv("~/mimic/icu/icustays.csv.gz")
@@ -487,7 +490,8 @@ admissions_tble <- admissions_tble %>%
   mutate(admit_minute = minute(admittime)) 
 
 ggplot(admissions_tble, aes(x = admit_minute)) +
-  geom_histogram(binwidth = 1, fill = "darkorange", color = "black", alpha = 0.8) +
+  geom_histogram(binwidth = 1, fill = "darkorange", 
+                 color = "black", alpha = 0.8) +
   scale_x_continuous(breaks = seq(0, 59, by = 5)) + 
   labs(title = "Distribution of ICU Admissions by Minute",
        x = "Minute of Admission (0-59)",
@@ -901,6 +905,8 @@ ggplot(mimic_icu_cohort, aes(x = race, y = los, fill = race)) +
 
 2. Boxplot of LOS versus Insurance 
 
+The boxplots below visualize the distribution of ICU length of stay (LOS) across different insurance types. Most insurance groups have a median ICU stay of a few days, with Medicare and Medicaid patients showing slightly longer median stays compared to other groups. All insurance categories exhibit significant variability in LOS. The "Other" and "Private" insurance groups display a wider spread, indicating a more diverse range of ICU stay durations. Outliers extend beyond 25 days in every insurance category, suggesting that while most patients have relatively short ICU stays, a small subset experiences extended admissions. "No charge" patients show slightly more variability than Medicaid and Medicare, possibly indicating that patients under financial assistance programs experience more variable ICU stays, potentially due to socioeconomic or healthcare access factors. Note: We limit the y-axis (length of stay in days) to 25 days for better readability of the graphs.
+
 ```{r}
 ggplot(mimic_icu_cohort %>% filter(!is.na(insurance)), 
        aes(x = insurance, y = los, fill = insurance)) +
@@ -915,35 +921,55 @@ ggplot(mimic_icu_cohort %>% filter(!is.na(insurance)),
 
 3. Boxplot of LOS versus Martial Status 
 
+The boxplot visualizes the distribution of ICU length of stay (LOS) across different marital statuses. The median LOS appears similar across all groups, indicating no significant differences in typical ICU stays between divorced, married, single, and widowed patients. Variability in LOS is present across all categories, with a few extreme outliers extending beyond 15 days. Widowed patients exhibit a slightly wider spread in LOS compared to other groups. The majority of ICU stays are short (under 5 days) across all marital statuses. The presence of outliers suggests that while most patients have short stays, a small subset experiences prolonged ICU admissions regardless of marital status. We can conclude that marital status does not strongly impact ICU length of stay, but further statistical tests are needed to confirm any potential associations. The y-axis is limited to 15 days for improved readability.
+
 ```{r}
-ggplot(mimic_icu_cohort, aes(x = marital_status, y = los, fill = marital_status)) +
+ggplot(mimic_icu_cohort %>% filter(!is.na(marital_status)), 
+       aes(x = marital_status, y = los, fill = marital_status)) +
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(title = "Length of ICU Stay vs Marital Status", 
        x = "Marital Status", 
        y = "Length of Stay (Days)") +
-  coord_cartesian(ylim = c(0, 25))  # Limits y-axis from 0 to 25
+  coord_cartesian(ylim = c(0, 15))  
 
 ```
 
 4. Boxplot of LOS versus Gender 
+
+The boxplot visualizes the distribution of ICU length of stay (LOS) by gender. The median LOS is nearly identical for both male and female patients, suggesting no substantial difference in typical ICU stays between genders. The interquartile range (IQR) is also similar, indicating that the majority of ICU stays are concentrated within a narrow range of a few days. However, both groups exhibit longer tails and extreme outliers, with some patients staying over 15 days. The presence of these outliers suggests that while most ICU stays are short, a small subset of patients experience prolonged admissions regardless of gender. The findings indicate that gender does not appear to be a strong predictor of ICU length of stay. The y-axis is limited to 15 days for better readability.
+
 ```{r}
 ggplot(mimic_icu_cohort, aes(x = gender, y = los, fill = gender)) +
   geom_boxplot() +
   labs(title = "Length of ICU Stay vs Gender", 
        x = "Gender", 
        y = "Length of Stay (Days)") +
-  coord_cartesian(ylim = c(0, 25))  # Limits y-axis from 0 to 25
+  coord_cartesian(ylim = c(0, 15))  
 ```
 
 5. Boplot of LOS versus Age in Time 
-```{r}
-ggplot(mimic_icu_cohort, aes(x = age_at_intime, y = los)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", col = "blue") +
-  labs(title = "Length of ICU Stay vs Age", x = "Age at ICU Admission", y = "Length of Stay (Days)")
-```
 
+The boxplot visualizes the distribution of ICU length of stay (LOS) across different age groups (age_in_time). The median ICU stay is fairly similar across all groups, indicating that age does not have a major impact on typical ICU stays. However, older patients (70+) show a slightly wider interquartile range (IQR), suggesting increased variability in LOS. Outliers extend beyond 20 days in all age groups, showing that a small subset of patients experience prolonged ICU admissions regardless of age. The <30 age group appears to have the lowest median LOS, while older groups tend to have a slightly longer and more variable LOS. This suggests that while most ICU stays are short, older patients may have more extended stays on average, potentially due to increased medical complexity.
+
+```{r}
+mimic_icu_cohort <- mimic_icu_cohort %>%
+  mutate(age_group = case_when(
+    age_at_intime < 30 ~ "<30",
+    age_at_intime >= 30 & age_at_intime < 50 ~ "30-49",
+    age_at_intime >= 50 & age_at_intime < 70 ~ "50-69",
+    age_at_intime >= 70 ~ "70+"
+  ))
+
+ggplot(mimic_icu_cohort, aes(x = age_group, y = los, fill = age_group)) +
+  geom_boxplot() +
+  labs(title = "Length of ICU Stay by Age Group",
+       x = "Age Group",
+       y = "Length of Stay (Days)") +
+  coord_cartesian(ylim = c(0, 20)) +
+  theme_minimal()
+
+```
 
 **Length of ICU stay los vs the last available lab measurements before ICU stay **
 
@@ -962,14 +988,14 @@ mimic_icu_cohort <- mimic_icu_cohort %>%
     los > 3 & los <= 7 ~ "3-7 Days",
     los > 7 ~ "> 7 Days"
   ), levels = c("< 1 Day", "1-3 Days", "3-7 Days", "> 7 Days"))) %>%
-  filter(!is.na(los_category))  # Remove NA values
+  filter(!is.na(los_category)) 
 
 mimic_long <- mimic_icu_cohort %>%
   select(los_category, all_of(lab_vars)) %>%
   pivot_longer(
     cols = all_of(lab_vars), names_to = "Lab_Variable", values_to = "Value"
   ) %>%
-  filter(!is.na(Value))  # Ensure lab values are not NA
+  filter(!is.na(Value)) 
 
 iqr_stats <- mimic_long %>%
   group_by(Lab_Variable) %>%
@@ -983,7 +1009,7 @@ iqr_stats <- mimic_long %>%
 
 mimic_long <- mimic_long %>%
   left_join(iqr_stats, by = "Lab_Variable") %>%
-  filter(Value >= y_min & Value <= y_max)  # Keep only minor outliers
+  filter(Value >= y_min & Value <= y_max)  
 
 los_colors <- c(
   "< 1 Day" = "#E74C3C",
@@ -1133,7 +1159,7 @@ ggplot(mimic_icu_cohort, aes(
   x = first_careunit, y = los, fill = first_careunit
 )) +
   geom_boxplot(outlier.size = 1, outlier.alpha = 0.6) +
-  coord_cartesian(ylim = c(0, 30)) +  # Limit y-axis
+  coord_cartesian(ylim = c(0, 30)) +  
   theme_minimal() +
   labs(
     title = "Length of ICU Stay vs First ICU Unit",
@@ -1153,7 +1179,7 @@ ggplot(mimic_icu_cohort, aes(
   )
 
 
-# Perform Kruskal-Wallis test (non-parametric alternative)
+# Perform Kruskal-Wallis test 
 kruskal_test <- kruskal.test(los ~ first_careunit, data = mimic_icu_cohort)
 print(kruskal_test)
 

@@ -1,7 +1,7 @@
 ---
 title: "Biostat 203B Homework 4"
 subtitle: "Due Mar 9 @ 11:59PM"
-author: "Your Name and UID"
+author: "Julie Lee"
 format:
   html:
     theme: cosmo
@@ -17,6 +17,7 @@ Display machine information:
 ```{r}
 sessionInfo()
 ```
+
 Display my machine memory.
 ```{r}
 memuse::Sys.meminfo()
@@ -39,12 +40,14 @@ Below is an outline of steps. In this homework, we exclusively work with the Big
 ### Q1.1 Connect to BigQuery
 
 Authenticate with BigQuery using the service account token. Please place the service account token (shared via BruinLearn) in the working directory (same folder as your qmd file). Do **not** ever add this token to your Git repository. If you do so, you will lose 50 points.
+
 ```{r}
 # path to the service account token 
 satoken <- "biostat-203b-2025-winter-4e58ec6e5579.json"
 # BigQuery authentication using service account
 bq_auth(path = satoken)
 ```
+
 Connect to BigQuery database `mimiciv_3_1` in GCP (Google Cloud Platform), using the project billing account `biostat-203b-2025-winter`.
 ```{r}
 # connect to the BigQuery database `biostat-203b-2025-mimiciv_3_1`
@@ -56,6 +59,7 @@ con_bq <- dbConnect(
 )
 con_bq
 ```
+
 List all tables in the `mimiciv_3_1` database.
 ```{r}
 dbListTables(con_bq)
@@ -77,7 +81,10 @@ icustays_tble <- tbl(con_bq, "icustays") |>
 Connect to the `admissions` table.
 ```{r}
 # # TODO
-# admissions_tble <- 
+# admissions_tble <- tbl(con_bq, "admissions") |>
+  arrange(subject_id, hadm_id, stay_id) |>
+  # show_query() |>
+  print(width = Inf)
 ```
 
 ### Q1.4 `patients` data
@@ -133,6 +140,7 @@ if (!dir.exists("mimiciv_shiny")) {
 mimic_icu_cohort |>
   write_rds("mimiciv_shiny/mimic_icu_cohort.rds", compress = "gz")
 ```
+
 Close database connection and clear workspace.
 ```{r}
 if (exists("con_bq")) {

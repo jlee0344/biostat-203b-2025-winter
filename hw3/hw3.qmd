@@ -682,6 +682,7 @@ labevents_tble <- labevents_tble %>%
 
 cat("Data processing complete.\n")
 print(head(labevents_tble))
+print(labevents_tble, n = 10, width = Inf)
 
 ```
 
@@ -803,7 +804,7 @@ icustays_filtered <- icustays_tble %>%
       ), 
     by = "subject_id"
   ) %>%
-  filter(anchor_age >= 18)
+  filter(age_at_intime >= 18)
 
 icu_admissions <- icustays_filtered %>%
   left_join(

@@ -125,7 +125,7 @@ labevents_tble <- tbl(con_bq, "labevents") |>
     wbc = `51301`,
   ) |> 
   select(subject_id, stay_id, bicarbonate, chloride, creatinine, 
-         glucose, potassium, sodium, hematocrit, wbc) |>  # Explicit column order
+         glucose, potassium, sodium, hematocrit, wbc) |>  
   arrange(subject_id, stay_id)
 labevents_tble 
 labevents_tble |> summarise(row_count = n())
@@ -139,66 +139,36 @@ Connect to `chartevents` table and retrieve a subset that only contain subjects 
 
 ```{r}
 chartevents_tble <- tbl(con_bq, "chartevents") |>
-  arrange(subject_id, hadm_id) |>
-  # show_query() |>
-  print(width = Inf)
-```
-
-```{r}
-chartevents_tble <- chartevents_tble |>
-  mutate(
-    storetime = as.POSIXct(storetime, 
-      format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
-    charttime = as.POSIXct(charttime, 
-      format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  )
-
-chartevents_filtered <- chartevents_tble |>
-  inner_join(icustays_tble, by = "stay_id") |>
-  filter(storetime >= intime & storetime < outtime)
-
-chartevents_filtered <- chartevents_filtered |>
-  rename(subject_id = subject_id.x) |>
-  select(-subject_id.y)
-
-first_store_per_stay <- chartevents_filtered |>
-  group_by(subject_id, stay_id, itemid) |>
-  arrange(storetime) %>%
-  slice_min(order_by = storetime, n = 1)|>
-  ungroup()
-
-chartevents_filtered <- chartevents_filtered %>%|>
-  inner_join(first_store_per_stay %>%
-    select(subject_id, stay_id, itemid, storetime),
-    by = c("subject_id", "stay_id", "itemid", "storetime")
-  ) %>%
-  select(-storetime)
-
-chartevents_filtered <- chartevents_filtered |>
-  group_by(subject_id, stay_id, itemid) %>%
-  summarize(valuenum_avg = mean(valuenum, na.rm = TRUE), 
-            .groups = "drop") %>%
-  ungroup()
-
-chartevents_tble <- chartevents_filtered |>
+  filter(itemid %in% c(220045, 220179, 220180, 223761, 220210)) |>  
+  select(subject_id, stay_id, itemid, valuenum, storetime) |>  
+  filter(!is.na(storetime)) |>  
+  inner_join(
+    tbl(con_bq, "icustays") |> select(subject_id, stay_id, intime, outtime),  
+    by = "stay_id"
+  ) |>  
+  filter(storetime >= intime & storetime < outtime) |>  
+  select(-subject_id_y) |> 
+  rename(subject_id = subject_id_x) |>  
+  group_by(subject_id, stay_id, itemid) |>  
+  slice_min(order_by = storetime, n = 1, with_ties = FALSE) |>  
+  ungroup() |>  
+  group_by(subject_id, stay_id, itemid) |>  
+  summarize(valuenum_avg = mean(valuenum, na.rm = TRUE), .groups = "drop") |> 
   pivot_wider(
-    names_from = itemid, values_from = valuenum_avg, 
+    names_from = itemid, values_from = valuenum_avg,
     names_prefix = "vital_"
-  )
-
-chartevents_tble <- chartevents_tble %>%
+  ) |>  
   rename(
     heart_rate = vital_220045,
     non_invasive_blood_pressure_systolic = vital_220179,
     non_invasive_blood_pressure_diastolic = vital_220180,
     temperature_fahrenheit = vital_223761,
     respiratory_rate = vital_220210
-  ) %>%
+  ) |>  
   arrange(subject_id, stay_id)
-
-print(chartevents_tble)
+chartevents_tble
+chartevents_tble |> summarise(row_count = n())
 ```
-
 
 ### Q1.7 Put things together
 

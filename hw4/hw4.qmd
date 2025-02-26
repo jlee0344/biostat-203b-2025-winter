@@ -140,20 +140,20 @@ Connect to `chartevents` table and retrieve a subset that only contain subjects 
 ```{r}
 chartevents_tble <- tbl(con_bq, "chartevents") |>
   filter(itemid %in% c(220045, 220179, 220180, 223761, 220210)) |>  
-  select(subject_id, stay_id, itemid, valuenum, storetime) |>  
-  filter(!is.na(storetime)) |>  
+  select(subject_id, stay_id, itemid, valuenum, storetime, charttime) |>  # Added charttime
   inner_join(
     tbl(con_bq, "icustays") |> select(subject_id, stay_id, intime, outtime),  
     by = "stay_id"
   ) |>  
   filter(storetime >= intime & storetime < outtime) |>  
-  select(-subject_id_y) |> 
+  select(-subject_id_y) |>  
   rename(subject_id = subject_id_x) |>  
   group_by(subject_id, stay_id, itemid) |>  
-  slice_min(order_by = storetime, n = 1, with_ties = FALSE) |>  
+  arrange(storetime) |>  
+  slice_min(order_by = storetime, n = 1, with_ties = TRUE) |>  
   ungroup() |>  
   group_by(subject_id, stay_id, itemid) |>  
-  summarize(valuenum_avg = mean(valuenum, na.rm = TRUE), .groups = "drop") |> 
+  summarize(valuenum_avg = mean(valuenum, na.rm = TRUE), .groups = "drop") |>  
   pivot_wider(
     names_from = itemid, values_from = valuenum_avg,
     names_prefix = "vital_"
@@ -166,6 +166,7 @@ chartevents_tble <- tbl(con_bq, "chartevents") |>
     respiratory_rate = vital_220210
   ) |>  
   arrange(subject_id, stay_id)
+
 chartevents_tble
 chartevents_tble |> summarise(row_count = n())
 ```

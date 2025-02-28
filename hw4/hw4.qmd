@@ -179,11 +179,31 @@ This step is similar to Q7 of HW3. Using _one_ chain of pipes `|>` to perform fo
 
 Use the collect command only until question 7 
 
+Creating the admit_hour variable (replicating what was in Homework #3) 
+
 ```{r}
-# # TODO
-# mimic_icu_cohort <- 
+admissions_tble <- admissions_tble  |>
+  mutate(admit_hour = hour(admittime))
 ```
 
+```{r}
+mimic_icu_cohort_2 <- icustays_tble |>
+  mutate(intime_year = year(as.Date(intime))) |>
+  left_join(patients_tble |> 
+              select(subject_id, anchor_age, anchor_year, anchor_year_group, dod, gender), 
+            by = "subject_id") |>
+  mutate(age_at_intime = anchor_age + (intime_year - anchor_year)) |>
+  filter(age_at_intime >= 18) |>
+  left_join(admissions_tble |> select(-admit_hour), 
+            by = c("subject_id", "hadm_id")) |>
+  left_join(chartevents_tble, by = c("subject_id", "stay_id")) |>
+  left_join(labevents_tble, by = c("subject_id", "stay_id")) |>
+  select(-intime_year) |> 
+  collect() |>
+  arrange(subject_id, hadm_id, stay_id) |>
+  distinct() |>
+  print(width = Inf)
+```
 
 ### Q1.8 Preprocessing
 
@@ -193,9 +213,74 @@ Hint: Below is a numerical summary of my tibble after preprocessing:
 
 <iframe width=95% height="500" src="./mimic_icu_cohort_gtsummary.html"></iframe>
 
+(1) Lump infrequent levels into "Other" level for `first_careunit`, `last_careunit`, `admission_type`, `admission_location`, and `discharge_location`
+
+```{r}
+# Step 1: Lump infrequent levels into "Other"
+mimic_icu_cohort_2 <- mimic_icu_cohort_2 %>%
+  mutate(
+    first_careunit = fct_lump_n(first_careunit, n = 5, other_level = "Other"),
+    last_careunit = fct_lump_n(last_careunit, n = 5, other_level = "Other"),
+    admission_type = fct_lump_n(admission_type, n = 5, other_level = "Other"),
+    admission_location = fct_lump_n(admission_location, n = 5, other_level = "Other"),
+    discharge_location = fct_lump_n(discharge_location, n = 5, other_level = "Other")
+  )
+```
+
+(2) Collapsing the levels of `race` into `ASIAN`, `BLACK`, `HISPANIC`, `WHITE`, and `Other`
+
+Examining the Unique Entries of Race and their Count: 
+
+```{r}
+mimic_icu_cohort_2 %>%
+  count(race, sort = TRUE)
+```
+
+```{r}
+mimic_icu_cohort_2 <- mimic_icu_cohort_2 %>%
+  mutate(
+    race = fct_collapse(
+      race,
+      ASIAN = c("ASIAN", "ASIAN - CHINESE", "ASIAN - KOREAN", "ASIAN - SOUTH EAST ASIAN", "ASIAN - ASIAN INDIAN" ),
+      BLACK = c("BLACK/AFRICAN AMERICAN", "BLACK/CAPE VERDEAN", "BLACK/CARIBBEAN ISLAND", "BLACK/AFRICAN"),
+      HISPANIC = c("HISPANIC/LATINO - PUERTO RICAN", "HISPANIC OR LATINO", "HISPANIC/LATINO - DOMINICAN", "HISPANIC/LATINO - CENTRAL AMERICAN", "HISPANIC/LATINO - GUATEMALAN", "HISPANIC/LATINO - COLUMBIAN", "HISPANIC/LATINO - CUBAN", "HISPANIC/LATINO - HONDURAN", "HISPANIC/LATINO - MEXICAN", "HISPANIC/LATINO - SALVADORAN"),
+      WHITE = c("WHITE", "WHITE - OTHER EUROPEAN", "WHITE - RUSSIAN", "WHITE - EASTERN EUROPEAN", "WHITE - BRAZILIAN"),
+      Other = c("UNKNOWN", "OTHER", "UNABLE TO OBTAIN", "MULTIPLE RACE/ETHNICITY", "PATIENT DECLINED TO ANSWER", "PORTUGUESE", "NATIVE HAWAIIAN OR OTHER PACIFIC ISLANDER", "AMERICAN INDIAN/ALASKA NATIVE", "SOUTH AMERICAN" )
+    )
+  )
+```
+
+Double checking that races were collasped correctly: 
+```{r}
+mimic_icu_cohort_2 %>%
+  count(race, sort = TRUE)
+```
+
+(3) Creating a new variable `los_long` that is `TRUE` when `los` is greater than or equal to 2 days
+
+```{r}
+# Step 3: Create new variable los_long (TRUE if LOS >= 2 days)
+mimic_icu_cohort_2 <- mimic_icu_cohort_2 %>%
+  mutate(los_long = los >= 2)
+```
+
+(4) Summarizing the data using 'tbl_summary()', stratified by 'los_long' 
+
+```{r}
+# Step 4: Summarize data using tbl_summary(), stratified by los_long
+summary_table <- mimic_icu_cohort_2 %>%
+  select(first_careunit, last_careunit, admission_type, admission_location, discharge_location, race, los_long) %>%
+  tbl_summary(by = los_long)
+
+# Print summary
+summary_table
+```
+
 ### Q1.9 Save the final tibble
 
 Save the final tibble to an R data file `mimic_icu_cohort.rds` in the `mimiciv_shiny` folder.
+
+**Note to self** Change the mimic_icu_cohort_2 to mimic_icu_cohort 
 
 ```{r}
 # make a directory mimiciv_shiny
@@ -203,7 +288,7 @@ if (!dir.exists("mimiciv_shiny")) {
   dir.create("mimiciv_shiny")
 }
 # save the final tibble
-mimic_icu_cohort |>
+mimic_icu_cohort_2 |>
   write_rds("mimiciv_shiny/mimic_icu_cohort.rds", compress = "gz")
 ```
 
@@ -221,8 +306,230 @@ Although it is not a good practice to add big data files to Git, for grading pur
 
 Develop a Shiny app for exploring the ICU cohort data created in Q1. The app should reside in the `mimiciv_shiny` folder. The app should contain at least two tabs. One tab provides easy access to the graphical and numerical summaries of variables (demographics, lab measurements, vitals) in the ICU cohort, using the `mimic_icu_cohort.rds` you curated in Q1. The other tab allows user to choose a specific patient in the cohort and display the patient's ADT and ICU stay information as we did in Q1 of HW3, by dynamically retrieving the patient's ADT and ICU stay information from BigQuery database. Again, do **not** ever add the BigQuery token to your Git repository. If you do so, you will lose 50 points.
 
+
 **Solution ** 
+
 1. Summary: Variable Group and Variable 
-- Example: Demograhics and Marital Status where race is on the x-axis and each box colored in different races and there is count on the y-axis. 
+
+Example: Demograhics and Marital Status where race is on the x-axis and each box colored in different races and there is count on the y-axis. 
 
 2. Patient Information 
+
+
+------------------------------------------
+
+Consolidating Graph for 1.1 
+
+Retrieving all the datasets...
+
+```{r}
+
+```
+
+```{r}
+diagnosis_details <- diagnosis_details %>%
+  mutate(icd_code = str_pad(icd_code, width = 5, side = "left", pad = "0")) %>%
+  left_join(diagnosis_codes, by = c("icd_code", "icd_version"))
+
+diagnosis_column <- grep("long_title", names(diagnosis_details), value = TRUE)
+
+if ("long_title" %in% diagnosis_column) {
+  diagnosis_details <- rename(diagnosis_details, 
+                              diagnosis_name = long_title)
+} else if ("long_title.x" %in% diagnosis_column) {
+  diagnosis_details <- rename(diagnosis_details, 
+                              diagnosis_name = long_title.x)
+} else if ("long_title.y" %in% diagnosis_column) {
+  diagnosis_details <- rename(diagnosis_details, 
+                              diagnosis_name = long_title.y)
+} else {
+  stop("No appropriate long_title column found in diagnosis_details")
+}
+
+top_conditions <- diagnosis_details %>%
+  filter(!is.na(diagnosis_name)) %>%
+  count(diagnosis_name, sort = TRUE) %>%
+  slice_head(n = 3) %>%
+  pull(diagnosis_name)
+
+top_conditions_text <- if (length(top_conditions) > 0) {
+  paste(top_conditions, collapse = "\n")
+} else { "" }
+
+patient_summary_text <- str_squish(paste0(
+  "Patient ", patient_record, ", ",
+  ifelse(is.na(patient_record$gender), "", 
+         paste0(patient_record$gender, ", ")),
+  ifelse(is.na(patient_record$anchor_age), "", 
+         paste0(patient_record$anchor_age, " years old, ")),
+  ifelse(is.na(admission_details$race), "", admission_details$race)
+))
+
+transfer_details <- transfer_details %>%
+  mutate(intime = as.POSIXct(intime, format = "%Y-%m-%d %H:%M:%S"),
+         outtime = as.POSIXct(outtime, format = "%Y-%m-%d %H:%M:%S")) %>%
+  filter(!is.na(outtime))
+
+lab_details <- lab_details %>%
+  mutate(chartdate = as.POSIXct(charttime, format = "%Y-%m-%d %H:%M:%S"))
+
+procedure_details <- procedure_details %>%
+  mutate(chartdate = as.POSIXct(chartdate, format = "%Y-%m-%d %H:%M:%S")) %>%
+  left_join(procedure_codes, by = c("icd_code", "icd_version"))
+
+procedure_name_column <- grep("long_title", names(procedure_details), 
+                              value = TRUE)
+
+if (length(procedure_name_column) > 1) {
+  procedure_details <- procedure_details %>%
+    select(-all_of(procedure_name_column[-1])) %>%
+    rename(procedure_name = first(procedure_name_column))
+} else {
+  procedure_details <- rename(procedure_details, 
+                              procedure_name = procedure_name_column)
+}
+```
+
+
+
+```{r}
+procedure_details <- procedure_details %>% 
+  filter(!is.na(procedure_name))
+
+distinct_care_units <- unique(transfer_details$careunit)
+distinct_procedures <- unique(procedure_details$procedure_name)
+
+care_unit_palette <- setNames(
+  RColorBrewer::brewer.pal(n = min(length(distinct_care_units), 9), 
+                           name = "Set1"),  
+  distinct_care_units
+)
+
+transfer_details <- transfer_details %>%
+  mutate(careunit = factor(careunit, levels = distinct_care_units))
+
+procedure_shapes <- setNames(
+  seq(15, 15 + length(distinct_procedures) - 1),
+  distinct_procedures
+)
+
+procedure_details <- procedure_details %>%
+  mutate(procedure_name = factor(procedure_name, levels = distinct_procedures))
+
+patient_timeline <- ggplot() +
+  geom_segment(data = transfer_details, 
+               aes(x = intime, xend = outtime, y = "ADT", yend = "ADT", 
+                   color = careunit), linewidth = 3) +
+  geom_point(data = lab_details, 
+             aes(x = chartdate, y = "Lab"), shape = 3, size = 3) +
+  geom_point(data = procedure_details, 
+             aes(x = chartdate, y = "Procedure", shape = procedure_name), 
+             size = 5) +
+  scale_color_manual(values = care_unit_palette) +  
+  scale_shape_manual(values = procedure_shapes, drop = FALSE) + 
+  scale_y_discrete(limits = c("Procedure", "Lab", "ADT")) +  
+  theme_minimal() +
+  labs(title = patient_summary_text, 
+       subtitle = top_conditions_text, 
+       x = "Calendar Time", 
+       y = NULL, 
+       color = "Care Unit", 
+       shape = "Procedure") +
+  guides(
+    color = guide_legend(order = 1, title.position = "top"),  
+    shape = guide_legend(order = 2, title.position = "top")   
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.box = "vertical",
+    legend.box.just = "center",
+    legend.spacing.y = unit(0.5, "cm"),
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10)
+  )
+
+print(patient_timeline)
+```
+
+Consolidating Graph for 1.2 
+
+chartevents.. 
+```{r}
+parquet_file <- "./chartevents_pq/part-0.parquet"
+start_time <- Sys.time()
+arrow_data <- open_dataset(parquet_file, format = "parquet")
+duckdb_conn <- dbConnect(duckdb::duckdb())
+
+invisible(to_duckdb(
+  .data = arrow_data,
+  con = duckdb_conn,
+  table_name = "chartevents",
+  auto_disconnect = FALSE
+))  
+subset_chartevents <- tbl(duckdb_conn, "chartevents") %>%
+  filter(itemid %in% c(220045, 220179, 220180, 223761, 220210)) %>%
+  arrange(subject_id, charttime, itemid,) %>% 
+  collect()
+
+dbDisconnect(duckdb_conn)
+```
+
+
+```{r}
+subject_id_of_interest <- 10063848
+
+subject_stays <- icustays_tble %>%
+  filter(subject_id == subject_id_of_interest) %>%
+  select(stay_id, intime, outtime) %>%
+  collect()  
+
+chartevents_filtered <- subset_chartevents %>%
+  filter(stay_id %in% subject_stays$stay_id) %>%
+  inner_join(subject_stays, by = "stay_id") %>%
+  filter(charttime >= intime & charttime <= outtime) %>%
+  select(stay_id, itemid, charttime, valuenum)
+
+chartevents_with_labels <- chartevents_filtered %>%
+  inner_join(d_items %>% select(itemid, abbreviation), by = "itemid") %>%
+  mutate(charttime = as_datetime(charttime))
+
+ggplot(chartevents_with_labels, 
+       aes(x = charttime, y = valuenum, color = abbreviation)) +
+  geom_point(size = 1.2) +  
+  geom_line(size = 0.8) +  
+  facet_grid(abbreviation ~ stay_id, scales = "free") +  
+  labs(
+    title = paste("Patient", subject_id_of_interest, "ICU stays - Vitals"),
+    x = "Time",
+    y = "Vital Value"
+  ) +
+  scale_x_datetime(
+    breaks = seq(
+      floor_date(min(chartevents_with_labels$charttime, na.rm = TRUE), 
+                 unit = "6 hours"),
+      ceiling_date(max(chartevents_with_labels$charttime, na.rm = TRUE), 
+                   unit = "6 hours"),
+      by = "6 hours"
+    ),
+    date_labels = "%b %d %H:%M"  
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",  
+    strip.text = element_text(size = 12, face = "bold", color = "white"), 
+    strip.background = element_rect(fill = "darkgrey", color = "darkgrey"), 
+    axis.text.x = element_text(angle = 0, hjust = 0.5),  
+    panel.grid.major = element_line(size = 0.5, linetype = "dotted", 
+                                    color = "gray"),  
+    panel.grid.minor = element_blank()  
+  )
+```
+
+
+
+
+
+
+
+
+

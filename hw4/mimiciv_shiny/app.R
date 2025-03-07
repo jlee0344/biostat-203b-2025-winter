@@ -33,7 +33,7 @@ procedure_codes_tble <- tbl(con_bq, "d_icd_procedures")
 patient_transfers_tble <- tbl(con_bq, "transfers") |> arrange(subject_id) 
 admissions_tble <- tbl(con_bq, "admissions") |> arrange(subject_id, hadm_id) 
 patients_tble <- tbl(con_bq, "patients") |> arrange(subject_id)
-
+  
 ui <- fluidPage(
   titlePanel("ICU Cohort Data"),
   

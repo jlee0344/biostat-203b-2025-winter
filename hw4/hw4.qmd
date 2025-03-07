@@ -31,7 +31,6 @@ library(DBI)
 library(gt)
 library(gtsummary)
 library(tidyverse)
-library(dbplyr)
 ```
 
 ## Q1. Compile the ICU cohort in HW3 from the Google BigQuery database 
@@ -141,7 +140,7 @@ Connect to `chartevents` table and retrieve a subset that only contain subjects 
 ```{r}
 chartevents_tble <- tbl(con_bq, "chartevents") |>
   filter(itemid %in% c(220045, 220179, 220180, 223761, 220210)) |>  
-  select(subject_id, stay_id, itemid, valuenum, storetime, charttime) |>  # Added charttime
+  select(subject_id, stay_id, itemid, valuenum, storetime, charttime) |>  
   inner_join(
     tbl(con_bq, "icustays") |> select(subject_id, stay_id, intime, outtime),  
     by = "stay_id"
@@ -191,7 +190,8 @@ admissions_tble <- admissions_tble  |>
 mimic_icu_cohort_2 <- icustays_tble |>
   mutate(intime_year = year(as.Date(intime))) |>
   left_join(patients_tble |> 
-              select(subject_id, anchor_age, anchor_year, anchor_year_group, dod, gender), 
+              select(subject_id, anchor_age, anchor_year, 
+                     anchor_year_group, dod, gender), 
             by = "subject_id") |>
   mutate(age_at_intime = anchor_age + (intime_year - anchor_year)) |>
   filter(age_at_intime >= 18) |>
@@ -220,11 +220,21 @@ Hint: Below is a numerical summary of my tibble after preprocessing:
 # Step 1: Lump infrequent levels into "Other"
 mimic_icu_cohort_2 <- mimic_icu_cohort_2 %>%
   mutate(
-    first_careunit = fct_lump_n(first_careunit, n = 4, other_level = "Other"),
-    last_careunit = fct_lump_n(last_careunit, n = 4, other_level = "Other"),
-    admission_type = fct_lump_n(admission_type, n = 4, other_level = "Other"),
-    admission_location = fct_lump_n(admission_location, n = 3, other_level = "Other"),
-    discharge_location = fct_lump_n(discharge_location, n = 4, other_level = "Other")
+    first_careunit = fct_lump_n(
+      first_careunit, n = 4, other_level = "Other"
+    ),
+    last_careunit = fct_lump_n(
+      last_careunit, n = 4, other_level = "Other"
+    ),
+    admission_type = fct_lump_n(
+      admission_type, n = 4, other_level = "Other"
+    ),
+    admission_location = fct_lump_n(
+      admission_location, n = 3, other_level = "Other"
+    ),
+    discharge_location = fct_lump_n(
+      discharge_location, n = 4, other_level = "Other"
+    )
   )
 ```
 
@@ -242,11 +252,31 @@ mimic_icu_cohort_2 <- mimic_icu_cohort_2 %>%
   mutate(
     race = fct_collapse(
       race,
-      ASIAN = c("ASIAN", "ASIAN - CHINESE", "ASIAN - KOREAN", "ASIAN - SOUTH EAST ASIAN", "ASIAN - ASIAN INDIAN" ),
-      BLACK = c("BLACK/AFRICAN AMERICAN", "BLACK/CAPE VERDEAN", "BLACK/CARIBBEAN ISLAND", "BLACK/AFRICAN"),
-      HISPANIC = c("HISPANIC/LATINO - PUERTO RICAN", "HISPANIC OR LATINO", "HISPANIC/LATINO - DOMINICAN", "HISPANIC/LATINO - CENTRAL AMERICAN", "HISPANIC/LATINO - GUATEMALAN", "HISPANIC/LATINO - COLUMBIAN", "HISPANIC/LATINO - CUBAN", "HISPANIC/LATINO - HONDURAN", "HISPANIC/LATINO - MEXICAN", "HISPANIC/LATINO - SALVADORAN"),
-      WHITE = c("WHITE", "WHITE - OTHER EUROPEAN", "WHITE - RUSSIAN", "WHITE - EASTERN EUROPEAN", "WHITE - BRAZILIAN"),
-      Other = c("UNKNOWN", "OTHER", "UNABLE TO OBTAIN", "MULTIPLE RACE/ETHNICITY", "PATIENT DECLINED TO ANSWER", "PORTUGUESE", "NATIVE HAWAIIAN OR OTHER PACIFIC ISLANDER", "AMERICAN INDIAN/ALASKA NATIVE", "SOUTH AMERICAN" )
+      ASIAN = c(
+        "ASIAN", "ASIAN - CHINESE", "ASIAN - KOREAN",
+        "ASIAN - SOUTH EAST ASIAN", "ASIAN - ASIAN INDIAN"
+      ),
+      BLACK = c(
+        "BLACK/AFRICAN AMERICAN", "BLACK/CAPE VERDEAN",
+        "BLACK/CARIBBEAN ISLAND", "BLACK/AFRICAN"
+      ),
+      HISPANIC = c(
+        "HISPANIC/LATINO - PUERTO RICAN", "HISPANIC OR LATINO",
+        "HISPANIC/LATINO - DOMINICAN", "HISPANIC/LATINO - CENTRAL AMERICAN",
+        "HISPANIC/LATINO - GUATEMALAN", "HISPANIC/LATINO - COLUMBIAN",
+        "HISPANIC/LATINO - CUBAN", "HISPANIC/LATINO - HONDURAN",
+        "HISPANIC/LATINO - MEXICAN", "HISPANIC/LATINO - SALVADORAN"
+      ),
+      WHITE = c(
+        "WHITE", "WHITE - OTHER EUROPEAN", "WHITE - RUSSIAN",
+        "WHITE - EASTERN EUROPEAN", "WHITE - BRAZILIAN"
+      ),
+      Other = c(
+        "UNKNOWN", "OTHER", "UNABLE TO OBTAIN",
+        "MULTIPLE RACE/ETHNICITY", "PATIENT DECLINED TO ANSWER",
+        "PORTUGUESE", "NATIVE HAWAIIAN OR OTHER PACIFIC ISLANDER",
+        "AMERICAN INDIAN/ALASKA NATIVE", "SOUTH AMERICAN"
+      )
     )
   )
 ```
@@ -268,9 +298,16 @@ mimic_icu_cohort_2 <- mimic_icu_cohort_2 %>%
 
 ```{r}
 summary_table <- mimic_icu_cohort_2 %>%
-  select(first_careunit, last_careunit, los, admission_type, admission_location, discharge_location, insurance, language, marital_status, race, hospital_expire_flag, gender, dod, chloride, creatinine, sodium, potassium, glucose, hematocrit, wbc, bicarbonate, non_invasive_blood_pressure_systolic, non_invasive_blood_pressure_diastolic, respiratory_rate, temperature_fahrenheit, heart_rate, age_at_intime,  los_long) %>%
+  select(
+    first_careunit, last_careunit, los, admission_type,
+    admission_location, discharge_location, insurance, language,
+    marital_status, race, hospital_expire_flag, gender, dod,
+    chloride, creatinine, sodium, potassium, glucose, hematocrit,
+    wbc, bicarbonate, non_invasive_blood_pressure_systolic,
+    non_invasive_blood_pressure_diastolic, respiratory_rate,
+    temperature_fahrenheit, heart_rate, age_at_intime, los_long
+  ) %>%
   tbl_summary(by = los_long)
-
 summary_table
 ```
 
@@ -298,6 +335,7 @@ if (exists("con_bq")) {
 rm(list = ls())
 ```
 
+
 Although it is not a good practice to add big data files to Git, for grading purpose, please add `mimic_icu_cohort.rds` to your Git repository.
 
 ## Q2. Shiny app
@@ -305,346 +343,9 @@ Although it is not a good practice to add big data files to Git, for grading pur
 Develop a Shiny app for exploring the ICU cohort data created in Q1. The app should reside in the `mimiciv_shiny` folder. The app should contain at least two tabs. One tab provides easy access to the graphical and numerical summaries of variables (demographics, lab measurements, vitals) in the ICU cohort, using the `mimic_icu_cohort.rds` you curated in Q1. The other tab allows user to choose a specific patient in the cohort and display the patient's ADT and ICU stay information as we did in Q1 of HW3, by dynamically retrieving the patient's ADT and ICU stay information from BigQuery database. Again, do **not** ever add the BigQuery token to your Git repository. If you do so, you will lose 50 points.
 
 
-```{r}
-library(shiny)
-```
 
-```{r}
 
-```
 
 
-**Solution ** 
-
-1. Summary: Variable Group and Variable 
-
-Example: Demograhics and Marital Status where race is on the x-axis and each box colored in different races and there is count on the y-axis. 
-
-2. Patient Information 
-
-
-------------------------------------------FROM OLD HOMEWORK 
-
-Consolidating Data for Patient Information graph: 
-
-
-```{r}
-#Old Homework 
-patient_data <- read_csv("~/mimic/hosp/patients.csv.gz")
-hospital_admissions <- read_csv("~/mimic/hosp/admissions.csv.gz")
-patient_transfers <- read_csv("~/mimic/hosp/transfers.csv.gz")
-lab_results <- read_parquet("./labevents_pq/part-0.parquet")
-medical_procedures <- read_csv("~/mimic/hosp/procedures_icd.csv.gz")
-patient_diagnoses <- read_csv("~/mimic/hosp/diagnoses_icd.csv.gz")
-procedure_codes <- read_csv("~/mimic/hosp/d_icd_procedures.csv.gz")
-diagnosis_codes <- read_csv("~/mimic/hosp/d_icd_diagnoses.csv.gz")
-icu_stays <- read_csv("~/mimic/icu/icustays.csv.gz")
-
-selected_patient <- 10063848
-patient_record <- patient_data %>%
-  filter(subject_id == !!selected_patient)
-admission_details <- hospital_admissions %>%
-  filter(subject_id == !!selected_patient)
-transfer_details <- patient_transfers %>%
-  filter(subject_id == !!selected_patient)
-lab_details <- lab_results %>%
-  filter(subject_id == !!selected_patient)
-procedure_details <- medical_procedures %>%
-  filter(subject_id == !!selected_patient)
-diagnosis_details <- patient_diagnoses %>%
-  filter(subject_id == !!selected_patient)
-icu_details <- icu_stays %>%
-  filter(subject_id == !!selected_patient)
-```
-
-
-
-
---------------------------------
-Reading New Data Sets (New Homework) 
-
-```{r}
-#New Homework 
-patient_transfers_tble <- tbl(con_bq, "transfers") |>
-  arrange(subject_id) |>
-  show_query() |>
-  print(width = Inf)
-```
-
-```{r}
-procedure_codes_tble <- tbl(con_bq, "d_icd_procedures") |>       
-  show_query() |> 
-  print(width = Inf) 
-```
-
-```{r}
-patient_diagnoses_tble <- tbl(con_bq, "diagnoses_icd") |>
-  arrange(subject_id) |>
-  show_query() |>
-  print(width = Inf)
-```
-
-```{r}
-medical_procedures_tble <- tbl(con_bq, "procedures_icd") |>
-  arrange(subject_id) |>
-  show_query() |>
-  print(width = Inf)
-```
-
-```{r}
-diagnoses_codes_tble <- tbl(con_bq, "d_icd_diagnoses") |>
-  show_query() |>
-  print(width = Inf)
-```
-
-```{r}
-lab_results_tble <- tbl(con_bq, "labevents") |>
-  arrange(subject_id) |>
-  show_query() |>
-  print(width = Inf)
-```
-
-------Start of Shiny App ------
-
-patient_transfers <- read_csv("~/mimic/hosp/transfers.csv.gz")
-
-New Data sets 
-
-```{r}
-#New Homework 
-patients_tble 
-admissions_tble 
-icustays_tble
-diagnoses_codes_tble 
-lab_results_tble #named as lab results but for lab events
-medical_procedures_tble
-patient_diagnoses_tble
-procedure_codes_tble
-lab_results_tble 
-patient_transfers_tble
-```
-
-```{r}
-#New Homework - Matches old homework 
-selected_patient <- 10063848
-patient_record <- patients_tble |>
-  filter(subject_id == !!selected_patient)
-admission_details <- admissions_tble |>
-  filter(subject_id == !!selected_patient)
-transfer_details <- patient_transfers_tble |>
-  filter(subject_id == !!selected_patient)
-lab_details <- lab_results_tble |>
-  filter(subject_id == !!selected_patient)
-procedure_details <- medical_procedures_tble |>
-  filter(subject_id == !!selected_patient)
-diagnosis_details <- patient_diagnoses_tble |>
-  filter(subject_id == !!selected_patient) |> arrange(hadm_id, seq_num)
-icu_details <- icustays_tble |>
-  filter(subject_id == !!selected_patient)
-
-diagnosis_details 
-```
-
-
-```{r}
-diagnosis_details <- diagnosis_details %>%
-  mutate(icd_code = sql("CASE 
-                          WHEN LENGTH(icd_code) < 5 THEN LPAD(icd_code, 5, '0') 
-                          ELSE icd_code 
-                        END")) %>%
-  left_join(diagnoses_codes_tble, by = c("icd_code", "icd_version")) %>%
-  collect() %>%   # Bring data into R first
-  arrange(hadm_id)  # Now ordering will work in R
-
-
-# Find column names that contain "long_title"
-diagnosis_column <- grep("long_title", colnames(diagnosis_details), value = TRUE)
-diagnosis_details
-```
-
-
-```{r}
-if ("long_title" %in% diagnosis_column) {
-  diagnosis_details <- rename(diagnosis_details, 
-                              diagnosis_name = long_title)
-} else if ("long_title.x" %in% diagnosis_column) {
-  diagnosis_details <- rename(diagnosis_details, 
-                              diagnosis_name = long_title.x)
-} else if ("long_title.y" %in% diagnosis_column) {
-  diagnosis_details <- rename(diagnosis_details, 
-                              diagnosis_name = long_title.y)
-} else {
-  stop("No appropriate long_title column found in diagnosis_details")
-}
-
-diagnosis_details
-```
-
-
-```{r}
-
-top_conditions <- diagnosis_details %>%
-  filter(!is.na(diagnosis_name)) %>%  # Remove NA values
-  group_by(diagnosis_name) %>%  
-  summarize(n = n(), .groups = "drop") %>%  # Count occurrences
-  arrange(desc(n)) %>%  # Sort in descending order
-  slice_head(n = 3) %>%  # Select top 3 rows
-  pull(diagnosis_name)  # Extract names
-
-# Format output as text
-top_conditions_text <- if (length(top_conditions) > 0) {
-  paste(top_conditions, collapse = "\n")
-} else { "" }
-
-top_conditions
-```
-
-
-#Edit from here: 
-#You need to fix this: 
-
-```{r}
-patient_summary_text <- patient_record %>%
-  mutate(
-    summary = str_squish(paste0(
-      "Patient ", id, ", ",
-      ifelse(is.na(gender), "", paste0(gender, ", ")),
-      ifelse(is.na(anchor_age), "", paste0(anchor_age, " years old, ")),
-      ifelse(is.na(race), "", race)
-    ))
-  ) %>%
-  pull(summary)
-
-print(patient_summary_text)
-
-```
-
-```{r}
-# Convert datetime fields to SQL-compatible format and filter out NULL `outtime`
-transfer_details <- transfer_details %>%
-  mutate(
-    intime = sql("CAST(intime AS DATETIME)"),
-    outtime = sql("CAST(outtime AS DATETIME)")
-  ) %>%
-  filter(!is.na(outtime)) %>%
-  arrange(hadm_id)  # Arrange by `hadm_id` before collecting
-
-# Collect the data into R if further local processing is needed
-transfer_details <- transfer_details %>% collect()
-
-# Print the final dataframe
-transfer_details
-```
-
-
-```{r}
-lab_details <- lab_details %>%
-  mutate(chartdate = sql("CAST(charttime AS DATETIME)"))
-```
-
-
-```{r}
-
-procedure_details <- procedure_details %>%
-  mutate(chartdate = sql("CAST(chartdate AS DATETIME)")) %>%
-  left_join(procedure_codes_tble, by = c("icd_code", "icd_version")) 
-
-procedure_name_column <- grep("long_title", colnames(procedure_details), value = TRUE)
-
-if (length(procedure_name_column) > 1) {
-  procedure_details <- procedure_details %>%
-    select(-all_of(procedure_name_column[-1])) %>%  # Keep only the first match
-    rename(procedure_name = !!procedure_name_column[1])  # Rename first match
-} else if (length(procedure_name_column) == 1) {
-  procedure_details <- procedure_details %>%
-    rename(procedure_name = !!procedure_name_column)
-}
-
-procedure_details <- procedure_details %>% collect()
-procedure_details
-
-```
-
-
-```{r}
-# Filter procedure details for valid values
-procedure_details <- procedure_details %>%
-  filter(!is.na(procedure_name))
-```
-
-
-```{r}
-# Unique care units and procedure names
-distinct_care_units <- transfer_details %>% pull(careunit) %>% unique()
-distinct_procedures <- procedure_details %>% pull(procedure_name) %>% unique()
-```
-
-
-```{r}
-# Define color palette for care units
-care_unit_palette <- setNames(
-  RColorBrewer::brewer.pal(n = min(length(distinct_care_units), 9), name = "Set1"),
-  distinct_care_units
-)
-
-# Convert careunit to factor
-transfer_details <- transfer_details %>%
-  mutate(careunit = factor(careunit, levels = distinct_care_units))
-
-# Define shape mappings for procedures
-procedure_shapes <- setNames(seq(15, 15 + length(distinct_procedures) - 1), distinct_procedures)
-
-# Convert procedure names to factor
-procedure_details <- procedure_details %>%
-  mutate(procedure_name = factor(procedure_name, levels = distinct_procedures))
-```
-
-
-```{r}
-# Create timeline plot (unchanged)
-patient_timeline <- ggplot() +
-  geom_segment(
-    data = transfer_details,
-    aes(x = intime, xend = outtime, y = "ADT", yend = "ADT", color = careunit),
-    linewidth = 3
-  ) +
-  geom_point(
-    data = lab_details,
-    aes(x = chartdate, y = "Lab"), shape = 3, size = 3
-  ) +
-  geom_point(
-    data = procedure_details,
-    aes(x = chartdate, y = "Procedure", shape = procedure_name),
-    size = 5
-  ) +
-  scale_color_manual(values = care_unit_palette) +
-  scale_shape_manual(values = procedure_shapes, drop = FALSE) +
-  scale_y_discrete(limits = c("Procedure", "Lab", "ADT")) +
-  theme_minimal() +
-  labs(
-    title = patient_summary_text,
-    subtitle = top_conditions_text,
-    x = "Calendar Time",
-    y = NULL,
-    color = "Care Unit",
-    shape = "Procedure"
-  ) +
-  guides(
-    color = guide_legend(order = 1, title.position = "top"),
-    shape = guide_legend(order = 2, title.position = "top")
-  ) +
-  theme(
-    legend.position = "bottom",
-    legend.box = "vertical",
-    legend.box.just = "center",
-    legend.spacing.y = unit(0.5, "cm"),
-    legend.title = element_text(size = 12, face = "bold"),
-    legend.text = element_text(size = 10)
-  )
-
-# Print the timeline plot
-print(patient_timeline)
-
-```
 
 

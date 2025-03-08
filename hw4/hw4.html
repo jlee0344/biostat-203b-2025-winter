@@ -3170,7 +3170,7 @@ loaded via a namespace (and not attached):
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>memuse<span class="sc">::</span><span class="fu">Sys.meminfo</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Totalram:  62.794 GiB 
-Freeram:   57.192 GiB </code></pre>
+Freeram:   59.548 GiB </code></pre>
 </div>
 </div>
 <p>Load database libraries and the tidyverse frontend:</p>
@@ -3734,7 +3734,7 @@ ORDER BY is ignored in subqueries without LIMIT
 </ol>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Lump infrequent levels into &quot;Other&quot;</span></span>
-<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>mimic_icu_cohort_2 <span class="ot">&lt;-</span> mimic_icu_cohort_2 <span class="sc">%&gt;%</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>mimic_icu_cohort_3 <span class="ot">&lt;-</span> mimic_icu_cohort_2 <span class="sc">%&gt;%</span></span>
 <span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
 <span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">first_careunit =</span> <span class="fu">fct_lump_n</span>(</span>
 <span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>      first_careunit, <span class="at">n =</span> <span class="dv">4</span>, <span class="at">other_level =</span> <span class="st">&quot;Other&quot;</span></span>
@@ -3778,7 +3778,7 @@ ORDER BY is ignored in subqueries without LIMIT
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>mimic_icu_cohort_2 <span class="ot">&lt;-</span> mimic_icu_cohort_2 <span class="sc">%&gt;%</span></span>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>mimic_icu_cohort_3 <span class="ot">&lt;-</span> mimic_icu_cohort_3 <span class="sc">%&gt;%</span></span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
 <span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">race =</span> <span class="fu">fct_collapse</span>(</span>
 <span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a>      race,</span>
@@ -3812,7 +3812,7 @@ ORDER BY is ignored in subqueries without LIMIT
 </div>
 <p>Double checking that races were collasped correctly:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>mimic_icu_cohort_2 <span class="sc">%&gt;%</span></span>
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>mimic_icu_cohort_3 <span class="sc">%&gt;%</span></span>
 <span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(race, <span class="at">sort =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 5 × 2
@@ -3829,14 +3829,14 @@ ORDER BY is ignored in subqueries without LIMIT
 <li>Creating a new variable <code>los_long</code> that is <code>TRUE</code> when <code>los</code> is greater than or equal to 2 days</li>
 </ol>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>mimic_icu_cohort_2 <span class="ot">&lt;-</span> mimic_icu_cohort_2 <span class="sc">%&gt;%</span></span>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>mimic_icu_cohort_3 <span class="ot">&lt;-</span> mimic_icu_cohort_3 <span class="sc">%&gt;%</span></span>
 <span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">los_long =</span> los <span class="sc">&gt;=</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <ol start="4" type="1">
 <li>Summarizing the data using ‘tbl_summary()’, stratified by ‘los_long’</li>
 </ol>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>summary_table <span class="ot">&lt;-</span> mimic_icu_cohort_2 <span class="sc">%&gt;%</span></span>
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>summary_table <span class="ot">&lt;-</span> mimic_icu_cohort_3 <span class="sc">%&gt;%</span></span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
 <span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>    first_careunit, last_careunit, los, admission_type,</span>
 <span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>    admission_location, discharge_location, insurance, language,</span>
@@ -3855,20 +3855,20 @@ The following errors were returned during `tbl_summary()`:
 </div>
 <div class="sourceCode cell-code" id="cb47"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>summary_table</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
-<div id="iafuqksyjt" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#iafuqksyjt table {
+<div id="uhhzyalotw" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#uhhzyalotw table {
 font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#iafuqksyjt thead, #iafuqksyjt tbody, #iafuqksyjt tfoot, #iafuqksyjt tr, #iafuqksyjt td, #iafuqksyjt th {
+#uhhzyalotw thead, #uhhzyalotw tbody, #uhhzyalotw tfoot, #uhhzyalotw tr, #uhhzyalotw td, #uhhzyalotw th {
 border-style: none;
 }
-#iafuqksyjt p {
+#uhhzyalotw p {
 margin: 0;
 padding: 0;
 }
-#iafuqksyjt .gt_table {
+#uhhzyalotw .gt_table {
 display: table;
 border-collapse: collapse;
 line-height: normal;
@@ -3893,11 +3893,11 @@ border-left-style: none;
 border-left-width: 2px;
 border-left-color: #D3D3D3;
 }
-#iafuqksyjt .gt_caption {
+#uhhzyalotw .gt_caption {
 padding-top: 4px;
 padding-bottom: 4px;
 }
-#iafuqksyjt .gt_title {
+#uhhzyalotw .gt_title {
 color: #333333;
 font-size: 125%;
 font-weight: initial;
@@ -3908,7 +3908,7 @@ padding-right: 5px;
 border-bottom-color: #FFFFFF;
 border-bottom-width: 0;
 }
-#iafuqksyjt .gt_subtitle {
+#uhhzyalotw .gt_subtitle {
 color: #333333;
 font-size: 85%;
 font-weight: initial;
@@ -3919,7 +3919,7 @@ padding-right: 5px;
 border-top-color: #FFFFFF;
 border-top-width: 0;
 }
-#iafuqksyjt .gt_heading {
+#uhhzyalotw .gt_heading {
 background-color: #FFFFFF;
 text-align: center;
 border-bottom-color: #FFFFFF;
@@ -3930,12 +3930,12 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#iafuqksyjt .gt_bottom_border {
+#uhhzyalotw .gt_bottom_border {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#iafuqksyjt .gt_col_headings {
+#uhhzyalotw .gt_col_headings {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -3949,7 +3949,7 @@ border-right-style: none;
 border-right-width: 1px;
 border-right-color: #D3D3D3;
 }
-#iafuqksyjt .gt_col_heading {
+#uhhzyalotw .gt_col_heading {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -3968,7 +3968,7 @@ padding-left: 5px;
 padding-right: 5px;
 overflow-x: hidden;
 }
-#iafuqksyjt .gt_column_spanner_outer {
+#uhhzyalotw .gt_column_spanner_outer {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -3979,13 +3979,13 @@ padding-bottom: 0;
 padding-left: 4px;
 padding-right: 4px;
 }
-#iafuqksyjt .gt_column_spanner_outer:first-child {
+#uhhzyalotw .gt_column_spanner_outer:first-child {
 padding-left: 0;
 }
-#iafuqksyjt .gt_column_spanner_outer:last-child {
+#uhhzyalotw .gt_column_spanner_outer:last-child {
 padding-right: 0;
 }
-#iafuqksyjt .gt_column_spanner {
+#uhhzyalotw .gt_column_spanner {
 border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
@@ -3996,10 +3996,10 @@ overflow-x: hidden;
 display: inline-block;
 width: 100%;
 }
-#iafuqksyjt .gt_spanner_row {
+#uhhzyalotw .gt_spanner_row {
 border-bottom-style: hidden;
 }
-#iafuqksyjt .gt_group_heading {
+#uhhzyalotw .gt_group_heading {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -4024,7 +4024,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 text-align: left;
 }
-#iafuqksyjt .gt_empty_group_heading {
+#uhhzyalotw .gt_empty_group_heading {
 padding: 0.5px;
 color: #333333;
 background-color: #FFFFFF;
@@ -4038,13 +4038,13 @@ border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 vertical-align: middle;
 }
-#iafuqksyjt .gt_from_md > :first-child {
+#uhhzyalotw .gt_from_md > :first-child {
 margin-top: 0;
 }
-#iafuqksyjt .gt_from_md > :last-child {
+#uhhzyalotw .gt_from_md > :last-child {
 margin-bottom: 0;
 }
-#iafuqksyjt .gt_row {
+#uhhzyalotw .gt_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -4062,7 +4062,7 @@ border-right-color: #D3D3D3;
 vertical-align: middle;
 overflow-x: hidden;
 }
-#iafuqksyjt .gt_stub {
+#uhhzyalotw .gt_stub {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -4074,7 +4074,7 @@ border-right-color: #D3D3D3;
 padding-left: 5px;
 padding-right: 5px;
 }
-#iafuqksyjt .gt_stub_row_group {
+#uhhzyalotw .gt_stub_row_group {
 color: #333333;
 background-color: #FFFFFF;
 font-size: 100%;
@@ -4087,13 +4087,13 @@ padding-left: 5px;
 padding-right: 5px;
 vertical-align: top;
 }
-#iafuqksyjt .gt_row_group_first td {
+#uhhzyalotw .gt_row_group_first td {
 border-top-width: 2px;
 }
-#iafuqksyjt .gt_row_group_first th {
+#uhhzyalotw .gt_row_group_first th {
 border-top-width: 2px;
 }
-#iafuqksyjt .gt_summary_row {
+#uhhzyalotw .gt_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -4102,14 +4102,14 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#iafuqksyjt .gt_first_summary_row {
+#uhhzyalotw .gt_first_summary_row {
 border-top-style: solid;
 border-top-color: #D3D3D3;
 }
-#iafuqksyjt .gt_first_summary_row.thick {
+#uhhzyalotw .gt_first_summary_row.thick {
 border-top-width: 2px;
 }
-#iafuqksyjt .gt_last_summary_row {
+#uhhzyalotw .gt_last_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -4118,7 +4118,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#iafuqksyjt .gt_grand_summary_row {
+#uhhzyalotw .gt_grand_summary_row {
 color: #333333;
 background-color: #FFFFFF;
 text-transform: inherit;
@@ -4127,7 +4127,7 @@ padding-bottom: 8px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#iafuqksyjt .gt_first_grand_summary_row {
+#uhhzyalotw .gt_first_grand_summary_row {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -4136,7 +4136,7 @@ border-top-style: double;
 border-top-width: 6px;
 border-top-color: #D3D3D3;
 }
-#iafuqksyjt .gt_last_grand_summary_row_top {
+#uhhzyalotw .gt_last_grand_summary_row_top {
 padding-top: 8px;
 padding-bottom: 8px;
 padding-left: 5px;
@@ -4145,10 +4145,10 @@ border-bottom-style: double;
 border-bottom-width: 6px;
 border-bottom-color: #D3D3D3;
 }
-#iafuqksyjt .gt_striped {
+#uhhzyalotw .gt_striped {
 background-color: rgba(128, 128, 128, 0.05);
 }
-#iafuqksyjt .gt_table_body {
+#uhhzyalotw .gt_table_body {
 border-top-style: solid;
 border-top-width: 2px;
 border-top-color: #D3D3D3;
@@ -4156,7 +4156,7 @@ border-bottom-style: solid;
 border-bottom-width: 2px;
 border-bottom-color: #D3D3D3;
 }
-#iafuqksyjt .gt_footnotes {
+#uhhzyalotw .gt_footnotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -4169,7 +4169,7 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#iafuqksyjt .gt_footnote {
+#uhhzyalotw .gt_footnote {
 margin: 0px;
 font-size: 90%;
 padding-top: 4px;
@@ -4177,7 +4177,7 @@ padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#iafuqksyjt .gt_sourcenotes {
+#uhhzyalotw .gt_sourcenotes {
 color: #333333;
 background-color: #FFFFFF;
 border-bottom-style: none;
@@ -4190,64 +4190,64 @@ border-right-style: none;
 border-right-width: 2px;
 border-right-color: #D3D3D3;
 }
-#iafuqksyjt .gt_sourcenote {
+#uhhzyalotw .gt_sourcenote {
 font-size: 90%;
 padding-top: 4px;
 padding-bottom: 4px;
 padding-left: 5px;
 padding-right: 5px;
 }
-#iafuqksyjt .gt_left {
+#uhhzyalotw .gt_left {
 text-align: left;
 }
-#iafuqksyjt .gt_center {
+#uhhzyalotw .gt_center {
 text-align: center;
 }
-#iafuqksyjt .gt_right {
+#uhhzyalotw .gt_right {
 text-align: right;
 font-variant-numeric: tabular-nums;
 }
-#iafuqksyjt .gt_font_normal {
+#uhhzyalotw .gt_font_normal {
 font-weight: normal;
 }
-#iafuqksyjt .gt_font_bold {
+#uhhzyalotw .gt_font_bold {
 font-weight: bold;
 }
-#iafuqksyjt .gt_font_italic {
+#uhhzyalotw .gt_font_italic {
 font-style: italic;
 }
-#iafuqksyjt .gt_super {
+#uhhzyalotw .gt_super {
 font-size: 65%;
 }
-#iafuqksyjt .gt_footnote_marks {
+#uhhzyalotw .gt_footnote_marks {
 font-size: 75%;
 vertical-align: 0.4em;
 position: initial;
 }
-#iafuqksyjt .gt_asterisk {
+#uhhzyalotw .gt_asterisk {
 font-size: 100%;
 vertical-align: 0;
 }
-#iafuqksyjt .gt_indent_1 {
+#uhhzyalotw .gt_indent_1 {
 text-indent: 5px;
 }
-#iafuqksyjt .gt_indent_2 {
+#uhhzyalotw .gt_indent_2 {
 text-indent: 10px;
 }
-#iafuqksyjt .gt_indent_3 {
+#uhhzyalotw .gt_indent_3 {
 text-indent: 15px;
 }
-#iafuqksyjt .gt_indent_4 {
+#uhhzyalotw .gt_indent_4 {
 text-indent: 20px;
 }
-#iafuqksyjt .gt_indent_5 {
+#uhhzyalotw .gt_indent_5 {
 text-indent: 25px;
 }
-#iafuqksyjt .katex-display {
+#uhhzyalotw .katex-display {
 display: inline-flex !important;
 margin-bottom: 0.75em !important;
 }
-#iafuqksyjt div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#uhhzyalotw div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
 height: 0px !important;
 }
 </style>

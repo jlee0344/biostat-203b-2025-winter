@@ -24,7 +24,8 @@ con_bq <- dbConnect(
 
 chartevents <- tbl(con_bq, "chartevents") |> arrange(subject_id)
 d_items <- tbl(con_bq, "d_items") 
-icustays_tble <- tbl(con_bq, "icustays") |> arrange(subject_id, hadm_id, stay_id) 
+icustays_tble <- tbl(con_bq, "icustays") |> 
+  arrange(subject_id, hadm_id, stay_id) 
 lab_results_tble <- tbl(con_bq, "labevents") |> arrange(subject_id) 
 diagnoses_codes_tble <- tbl(con_bq, "d_icd_diagnoses")
 medical_procedures_tble <- tbl(con_bq, "procedures_icd") |> arrange(subject_id)
@@ -42,7 +43,8 @@ ui <- fluidPage(
              sidebarLayout(
                sidebarPanel(
                  selectInput("variable_group", "Variable Group:",
-                             choices = c("Demographic", "Lab Measurements", "Vitals", "ICU Stay Information")),
+                             choices = c("Demographic", "Lab Measurements", 
+                                         "Vitals", "ICU Stay Information")),
                  
                  selectInput("variable", "Variable:", choices = NULL),
                  
@@ -60,7 +62,8 @@ ui <- fluidPage(
                sidebarPanel(
                  numericInput("subject_id", "Subject Id:", value = NULL),
                  radioButtons("plot_type", "Choose a plot type:",
-                              choices = c("ADT History" = "adt", "ICU Stay Record" = "icu")),
+                              choices = c("ADT History" = "adt", 
+                                          "ICU Stay Record" = "icu")),
                  actionButton("submit", "Submit")
                ),
                mainPanel(
@@ -74,7 +77,8 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   # Define variable groups
   demographic_vars <- c("Race" = "race", "Insurance" = "insurance", 
-                        "Marital Status" = "marital_status", "Gender" = "gender", 
+                        "Marital Status" = "marital_status", 
+                        "Gender" = "gender", 
                         "Age at Intime" = "age_at_intime")
   
   lab_vars <- c("Bicarbonate" = "bicarbonate", "Chloride" = "chloride", 
@@ -90,7 +94,6 @@ server <- function(input, output, session) {
   
   icu_vars <- c("Last Care Unit" = "last_careunit")
   
-  # Update variable dropdown based on selected group
   observeEvent(input$variable_group, {
     updateSelectInput(session, "variable",
                       choices = switch(input$variable_group,
@@ -101,60 +104,64 @@ server <- function(input, output, session) {
                       ))
   })
   
-  # Dynamically show the outlier removal checkbox only for Lab Measurements and Vitals
   output$outlier_checkbox <- renderUI({
     if (input$variable_group %in% c("Lab Measurements", "Vitals")) {
-      checkboxInput("remove_outliers", "Remove extreme outliers using IQR?", FALSE)
+      checkboxInput("remove_outliers", "Remove extreme outliers using IQR?", 
+                    FALSE)
     }
   })
   
-  # Function to remove outliers using IQR method
   remove_outliers_iqr <- function(data, column) {
     Q1 <- quantile(data[[column]], 0.25, na.rm = TRUE)
     Q3 <- quantile(data[[column]], 0.75, na.rm = TRUE)
     IQR_value <- Q3 - Q1
     lower_bound <- Q1 - 1.5 * IQR_value
     upper_bound <- Q3 + 1.5 * IQR_value
-    data %>% filter(data[[column]] >= lower_bound & data[[column]] <= upper_bound)
+    data %>% filter(data[[column]] >= lower_bound & data[[column]] 
+                    <= upper_bound)
   }
   
-  # Generate plots for Data Exploration tab
   output$plot <- renderPlot({
     req(input$variable)
     
-    df <- mimic_icu_cohort %>% filter(!is.na(!!sym(input$variable)))  # Remove NA values
+    df <- mimic_icu_cohort %>% filter(!is.na(!!sym(input$variable)))  
     
-    # Apply IQR filtering only if the checkbox is shown and selected
-    if (!is.null(input$remove_outliers) && input$remove_outliers && input$variable_group %in% c("Lab Measurements", "Vitals")) {
+    if (!is.null(input$remove_outliers) && input$remove_outliers && 
+        input$variable_group %in% c("Lab Measurements", "Vitals")) {
       df <- remove_outliers_iqr(df, input$variable)
     }
     
-    # If categorical variable (Demographics or ICU Stay Info), use colored bar plot with legend
-    if (input$variable %in% c("race", "insurance", "marital_status", "gender", "first_careunit", "last_careunit")) {
+    if (input$variable %in% c("race", "insurance", "marital_status", "gender", 
+                              "first_careunit", "last_careunit")) {
       ggplot(df, aes_string(x = input$variable, fill = input$variable)) +
         geom_bar() +
         scale_fill_brewer(palette = "Set2") +  # Predefined color palette
         theme_minimal() +
-        labs(title = paste("Distribution of", input$variable), x = input$variable, y = "Count", fill = "Category") +
+        labs(title = paste("Distribution of", input$variable), 
+             x = input$variable, y = "Count", fill = "Category") +
         theme(
           legend.position = "right",
-          axis.text.x = element_text(angle = 45, hjust = 1, size = 10),  # Rotate x labels
+          axis.text.x = element_text(angle = 45, hjust = 1, size = 10), 
           axis.text.y = element_text(size = 12),
           plot.title = element_text(size = 14, face = "bold")
         )
       
     } else if (input$variable == "age_at_intime") {
       ggplot(df, aes(x = age_at_intime)) +
-        geom_histogram(binwidth = 1, fill = "#0072B2", color = "black") +  # Blue color
+        geom_histogram(binwidth = 1, fill = "#0072B2", color = "black") +  
         theme_minimal() +
-        labs(title = "Age at Intime Distribution", x = "Age at Intime", y = "Count")
+        labs(title = "Age at Intime Distribution", 
+             x = "Age at Intime", y = "Count")
       
     } else {
       ggplot(df, aes_string(x = input$variable)) +
-        geom_histogram(binwidth = (max(df[[input$variable]], na.rm = TRUE) - min(df[[input$variable]], na.rm = TRUE)) / 30, 
+        geom_histogram(binwidth = (max(df[[input$variable]], 
+                                       na.rm = TRUE) - min(df[[input$variable]], 
+                                                           na.rm = TRUE)) / 30, 
                        fill = "gray30", color = "black") +
         theme_minimal() +
-        labs(title = paste("Distribution of", input$variable), x = input$variable, y = "Count") 
+        labs(title = paste("Distribution of", input$variable), 
+             x = input$variable, y = "Count") 
     }
   })
   
@@ -163,10 +170,12 @@ server <- function(input, output, session) {
     
     df <- mimic_icu_cohort %>%
       mutate(NA_Count = sum(is.na(!!sym(input$variable))))  
-    if (!is.null(input$remove_outliers) && input$remove_outliers && input$variable_group %in% c("Lab Measurements", "Vitals")) {
+    if (!is.null(input$remove_outliers) && input$remove_outliers && 
+        input$variable_group %in% c("Lab Measurements", "Vitals")) {
       df <- remove_outliers_iqr(df, input$variable)
     }
-    if (input$variable_group %in% c("Lab Measurements", "Vitals") || input$variable == "age_at_intime") {
+    if (input$variable_group %in% c("Lab Measurements", "Vitals") || 
+        input$variable == "age_at_intime") {
       df %>%
         summarise(
           Min = min(!!sym(input$variable), na.rm = TRUE),
@@ -182,7 +191,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # Reactive value to store the selected subject ID and plot type
   plot_data <- eventReactive(input$submit, {
     list(
       subject_id = input$subject_id,
@@ -190,7 +198,6 @@ server <- function(input, output, session) {
     )
   })
   
-  # Render the selected plot
   output$selected_plot_ui <- renderUI({
     req(plot_data())
     if (plot_data()$plot_type == "adt") {
@@ -200,7 +207,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # Generate patient timeline plot for ADT
   output$patient_timeline <- renderPlot({
     req(plot_data())
     
@@ -223,14 +229,16 @@ server <- function(input, output, session) {
     
     diagnosis_details <- diagnosis_details %>%
       mutate(icd_code = sql("CASE 
-                              WHEN LENGTH(icd_code) < 5 THEN LPAD(icd_code, 5, '0') 
+                              WHEN LENGTH(icd_code) < 5 
+                              THEN LPAD(icd_code, 5, '0') 
                               ELSE icd_code 
                             END")) %>%
       left_join(diagnoses_codes_tble, by = c("icd_code", "icd_version")) %>%
       collect() %>%   # Bring data into R first
       arrange(hadm_id)  # Now ordering will work in R
     
-    diagnosis_column <- grep("long_title", colnames(diagnosis_details), value = TRUE)
+    diagnosis_column <- grep("long_title", colnames(diagnosis_details), 
+                             value = TRUE)
     
     if ("long_title" %in% diagnosis_column) {
       diagnosis_details <- rename(diagnosis_details, 
@@ -286,12 +294,13 @@ server <- function(input, output, session) {
       mutate(chartdate = sql("CAST(chartdate AS DATETIME)")) %>%
       left_join(procedure_codes_tble, by = c("icd_code", "icd_version")) 
     
-    procedure_name_column <- grep("long_title", colnames(procedure_details), value = TRUE)
+    procedure_name_column <- grep("long_title", colnames(procedure_details), 
+                                  value = TRUE)
     
     if (length(procedure_name_column) > 1) {
       procedure_details <- procedure_details %>%
-        select(-all_of(procedure_name_column[-1])) %>%  # Keep only the first match
-        rename(procedure_name = !!procedure_name_column[1])  # Rename first match
+        select(-all_of(procedure_name_column[-1])) %>%  
+        rename(procedure_name = !!procedure_name_column[1])  
     } else if (length(procedure_name_column) == 1) {
       procedure_details <- procedure_details %>%
         rename(procedure_name = !!procedure_name_column)
@@ -303,21 +312,26 @@ server <- function(input, output, session) {
       filter(!is.na(procedure_name))
     
     distinct_care_units <- transfer_details %>% pull(careunit) %>% unique()
-    distinct_procedures <- procedure_details %>% pull(procedure_name) %>% unique()
+    distinct_procedures <- procedure_details %>% 
+      pull(procedure_name) %>% unique()
     
     care_unit_palette <- setNames(
-      RColorBrewer::brewer.pal(n = min(length(distinct_care_units), 9), name = "Set1"),
+      RColorBrewer::brewer.pal(n = min(length(distinct_care_units), 9), 
+                               name = "Set1"),
       distinct_care_units
     )
     
     transfer_details <- transfer_details %>%
-      mutate(line_width = ifelse(grepl("ICU|CCU|SICU", careunit, ignore.case = TRUE), 5.5, 2.0))
+      mutate(line_width = ifelse(grepl("ICU|CCU|SICU", careunit, 
+                                       ignore.case = TRUE), 5.5, 2.0))
     
     custom_shapes <- c(15, 16, 17, 18, 25, 8, 3, 4)
-    procedure_shapes <- setNames(custom_shapes[1:length(distinct_procedures)], distinct_procedures)
+    procedure_shapes <- setNames(custom_shapes[1:length(distinct_procedures)], 
+                                 distinct_procedures)
     
     procedure_details <- procedure_details %>%
-      mutate(procedure_name = factor(procedure_name, levels = distinct_procedures))
+      mutate(procedure_name = factor(procedure_name, levels = 
+                                       distinct_procedures))
     
     patient_timeline <- ggplot() +
       geom_segment(data = transfer_details, 
@@ -373,7 +387,7 @@ server <- function(input, output, session) {
       arrange(subject_id, charttime, itemid)  
     
     chartevents_filtered <- subset_chartevents %>%
-      semi_join(subject_stays, by = "stay_id") %>%  # More efficient filtering in dbplyr
+      semi_join(subject_stays, by = "stay_id") %>%  
       inner_join(subject_stays, by = "stay_id") %>%
       filter(charttime >= intime & charttime <= outtime) %>%
       select(stay_id, itemid, charttime, valuenum)
@@ -384,8 +398,6 @@ server <- function(input, output, session) {
       collect() %>%  
       mutate(charttime = as_datetime(charttime))
     
-    
-    # Now plot with ggplot after data is collected
     ggplot(chartevents_with_labels, 
            aes(x = charttime, y = valuenum, color = abbreviation)) +
       geom_point(linewidth = 1.2) +  
@@ -418,9 +430,4 @@ server <- function(input, output, session) {
       )
   }) }
 
-
-# Run the application 
 shinyApp(ui = ui, server = server)
-
-
-

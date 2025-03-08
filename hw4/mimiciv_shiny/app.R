@@ -75,7 +75,6 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-  # Define variable groups
   demographic_vars <- c("Race" = "race", "Insurance" = "insurance", 
                         "Marital Status" = "marital_status", 
                         "Gender" = "gender", 
@@ -135,7 +134,7 @@ server <- function(input, output, session) {
                               "first_careunit", "last_careunit")) {
       ggplot(df, aes_string(x = input$variable, fill = input$variable)) +
         geom_bar() +
-        scale_fill_brewer(palette = "Set2") +  # Predefined color palette
+        scale_fill_brewer(palette = "Set2") + 
         theme_minimal() +
         labs(title = paste("Distribution of", input$variable), 
              x = input$variable, y = "Count", fill = "Category") +
@@ -234,8 +233,8 @@ server <- function(input, output, session) {
                               ELSE icd_code 
                             END")) %>%
       left_join(diagnoses_codes_tble, by = c("icd_code", "icd_version")) %>%
-      collect() %>%   # Bring data into R first
-      arrange(hadm_id)  # Now ordering will work in R
+      collect() %>%   
+      arrange(hadm_id) 
     
     diagnosis_column <- grep("long_title", colnames(diagnosis_details), 
                              value = TRUE)
@@ -283,7 +282,7 @@ server <- function(input, output, session) {
         outtime = sql("CAST(outtime AS DATETIME)")
       ) %>%
       filter(!is.na(outtime)) %>%
-      arrange(hadm_id)  # Arrange by `hadm_id` before collecting
+      arrange(hadm_id)  
     
     transfer_details <- transfer_details %>% collect()
     
@@ -372,7 +371,6 @@ server <- function(input, output, session) {
     print(patient_timeline)
   })
   
-  # Generate ICU plot for vitals
   output$icu_plot <- renderPlot({
     req(plot_data())
     

@@ -34,7 +34,63 @@ procedure_codes_tble <- tbl(con_bq, "d_icd_procedures")
 patient_transfers_tble <- tbl(con_bq, "transfers") |> arrange(subject_id) 
 admissions_tble <- tbl(con_bq, "admissions") |> arrange(subject_id, hadm_id) 
 patients_tble <- tbl(con_bq, "patients") |> arrange(subject_id)
-  
+
+#Grouping all Race for Better Readability: 
+mimic_icu_cohort <- mimic_icu_cohort %>%
+  mutate(
+    race = fct_collapse(
+      race,
+      ASIAN = c(
+        "ASIAN", "ASIAN - CHINESE", "ASIAN - KOREAN",
+        "ASIAN - SOUTH EAST ASIAN", "ASIAN - ASIAN INDIAN"
+      ),
+      BLACK = c(
+        "BLACK/AFRICAN AMERICAN", "BLACK/CAPE VERDEAN",
+        "BLACK/CARIBBEAN ISLAND", "BLACK/AFRICAN"
+      ),
+      HISPANIC = c(
+        "HISPANIC/LATINO - PUERTO RICAN", "HISPANIC OR LATINO",
+        "HISPANIC/LATINO - DOMINICAN", "HISPANIC/LATINO - CENTRAL AMERICAN",
+        "HISPANIC/LATINO - GUATEMALAN", "HISPANIC/LATINO - COLUMBIAN",
+        "HISPANIC/LATINO - CUBAN", "HISPANIC/LATINO - HONDURAN",
+        "HISPANIC/LATINO - MEXICAN", "HISPANIC/LATINO - SALVADORAN"
+      ),
+      WHITE = c(
+        "WHITE", "WHITE - OTHER EUROPEAN", "WHITE - RUSSIAN",
+        "WHITE - EASTERN EUROPEAN", "WHITE - BRAZILIAN"
+      ),
+      Other = c(
+        "UNKNOWN", "OTHER", "UNABLE TO OBTAIN",
+        "MULTIPLE RACE/ETHNICITY", "PATIENT DECLINED TO ANSWER",
+        "PORTUGUESE", "NATIVE HAWAIIAN OR OTHER PACIFIC ISLANDER",
+        "AMERICAN INDIAN/ALASKA NATIVE", "SOUTH AMERICAN"
+      )
+    )
+  )
+
+
+#Grouping all Last Care Unit for Better Readability: 
+mimic_icu_cohort <- mimic_icu_cohort %>%
+  mutate(
+    first_careunit = fct_lump_n(
+      first_careunit, n = 4, other_level = "Other"
+    ),
+    last_careunit = fct_lump_n(
+      last_careunit, n = 4, other_level = "Other"
+    ),
+    admission_type = fct_lump_n(
+      admission_type, n = 4, other_level = "Other"
+    ),
+    admission_location = fct_lump_n(
+      admission_location, n = 3, other_level = "Other"
+    ),
+    discharge_location = fct_lump_n(
+      discharge_location, n = 4, other_level = "Other"
+    )
+  )
+
+
+
 ui <- fluidPage(
   titlePanel("ICU Cohort Data"),
   

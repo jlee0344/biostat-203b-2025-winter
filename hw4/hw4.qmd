@@ -337,7 +337,6 @@ rm(list = ls())
 ```
 
 
-
 Although it is not a good practice to add big data files to Git, for grading purpose, please add `mimic_icu_cohort.rds` to your Git repository.
 
 ## Q2. Shiny app

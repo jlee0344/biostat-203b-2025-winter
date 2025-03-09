@@ -52,7 +52,10 @@ Hint: We need to pull information from data files `patients.csv.gz`, `admissions
 
 ```{r}
 system("ls -ld ./labevents_pq")
+```
 
+
+```{r}
 patient_data <- read_csv("~/mimic/hosp/patients.csv.gz")
 hospital_admissions <- read_csv("~/mimic/hosp/admissions.csv.gz")
 patient_transfers <- read_csv("~/mimic/hosp/transfers.csv.gz")
@@ -62,8 +65,11 @@ patient_diagnoses <- read_csv("~/mimic/hosp/diagnoses_icd.csv.gz")
 procedure_codes <- read_csv("~/mimic/hosp/d_icd_procedures.csv.gz")
 diagnosis_codes <- read_csv("~/mimic/hosp/d_icd_diagnoses.csv.gz")
 icu_stays <- read_csv("~/mimic/icu/icustays.csv.gz")
+```
 
-selected_patient <- 10063848
+
+```{r}
+selected_patient <-10063848
 patient_record <- patient_data %>%
   filter(subject_id == !!selected_patient)
 admission_details <- hospital_admissions %>%
@@ -78,9 +84,7 @@ diagnosis_details <- patient_diagnoses %>%
   filter(subject_id == !!selected_patient)
 icu_details <- icu_stays %>%
   filter(subject_id == !!selected_patient)
-```
 
-```{r}
 diagnosis_details <- diagnosis_details %>%
   mutate(icd_code = str_pad(icd_code, width = 5, side = "left", pad = "0")) %>%
   left_join(diagnosis_codes, by = c("icd_code", "icd_version"))
@@ -111,7 +115,7 @@ top_conditions_text <- if (length(top_conditions) > 0) {
 } else { "" }
 
 patient_summary_text <- str_squish(paste0(
-  "Patient ", patient_record, ", ",
+  "Patient ", patient_record$subject_id, ", ",
   ifelse(is.na(patient_record$gender), "", 
          paste0(patient_record$gender, ", ")),
   ifelse(is.na(patient_record$anchor_age), "", 
@@ -129,10 +133,9 @@ lab_details <- lab_details %>%
 
 procedure_details <- procedure_details %>%
   mutate(chartdate = as.POSIXct(chartdate, format = "%Y-%m-%d %H:%M:%S")) %>%
-  left_join(procedure_codes, by = c("icd_code", "icd_version"))
+  left_join(procedure_codes, by = c("icd_code", "icd_version")
 
 procedure_name_column <- grep("long_title", names(procedure_details), 
-                              value = TRUE)
 
 if (length(procedure_name_column) > 1) {
   procedure_details <- procedure_details %>%
@@ -156,7 +159,8 @@ care_unit_palette <- setNames(
 )
 
 transfer_details <- transfer_details %>%
-  mutate(careunit = factor(careunit, levels = distinct_care_units))
+  mutate(line_width = ifelse(grepl("ICU|CCU|SICU", careunit, 
+                                   ignore.case = TRUE), 4.5, 3.5))  
 
 procedure_shapes <- setNames(
   seq(15, 15 + length(distinct_procedures) - 1),
@@ -168,8 +172,11 @@ procedure_details <- procedure_details %>%
 
 patient_timeline <- ggplot() +
   geom_segment(data = transfer_details, 
-               aes(x = intime, xend = outtime, y = "ADT", yend = "ADT", 
-                   color = careunit), linewidth = 3) +
+               aes(x = intime, xend = outtime, 
+                   y = "ADT", yend = "ADT", 
+                   color = careunit, 
+                   linewidth = line_width), 
+               alpha = 0.8) +  # Keeps Care Unit legend
   geom_point(data = lab_details, 
              aes(x = chartdate, y = "Lab"), shape = 3, size = 3) +
   geom_point(data = procedure_details, 
@@ -177,13 +184,14 @@ patient_timeline <- ggplot() +
              size = 5) +
   scale_color_manual(values = care_unit_palette) +  
   scale_shape_manual(values = procedure_shapes, drop = FALSE) + 
+  scale_linewidth_continuous(guide = "none") +  # Removes linewidth legend
   scale_y_discrete(limits = c("Procedure", "Lab", "ADT")) +  
   theme_minimal() +
   labs(title = patient_summary_text, 
        subtitle = top_conditions_text, 
        x = "Calendar Time", 
        y = NULL, 
-       color = "Care Unit", 
+       color = "Care Unit",  
        shape = "Procedure") +
   guides(
     color = guide_legend(order = 1, title.position = "top"),  
@@ -197,9 +205,7 @@ patient_timeline <- ggplot() +
     legend.title = element_text(size = 12, face = "bold"),
     legend.text = element_text(size = 10)
   )
-
 print(patient_timeline)
-
 ```
 ### Q1.2 ICU stays
 
@@ -236,14 +242,13 @@ dbDisconnect(duckdb_conn)
 ```{r}
 icustays_tble <- read_csv("~/mimic/icu/icustays.csv.gz")
 d_items <- read_csv("~/mimic/icu/d_items.csv.gz") 
-```
-```{r}
+
 subject_id_of_interest <- 10063848
 
 subject_stays <- icustays_tble %>%
   filter(subject_id == subject_id_of_interest) %>%
   select(stay_id, intime, outtime) %>%
-  collect()  
+  collect()
 
 chartevents_filtered <- subset_chartevents %>%
   filter(stay_id %in% subject_stays$stay_id) %>%
@@ -682,6 +687,7 @@ labevents_tble <- labevents_tble %>%
 
 cat("Data processing complete.\n")
 print(head(labevents_tble))
+print(labevents_tble, n = 10, width = Inf)
 
 ```
 
@@ -793,6 +799,7 @@ icustays_tble <- icustays_tble %>%
 
 ```
 
+
 ```{r}
 icustays_filtered <- icustays_tble %>%
   inner_join(
@@ -803,7 +810,7 @@ icustays_filtered <- icustays_tble %>%
       ), 
     by = "subject_id"
   ) %>%
-  filter(anchor_age >= 18)
+  filter(age_at_intime >= 18)
 
 icu_admissions <- icustays_filtered %>%
   left_join(
@@ -824,6 +831,8 @@ mimic_icu_cohort <- icu_final %>%
   distinct()
 
 print(mimic_icu_cohort)
+
+colnames(mimic_icu_cohort)
 ```
 
 ## Q8. Exploratory data analysis (EDA)
@@ -961,7 +970,7 @@ mimic_icu_cohort <- mimic_icu_cohort %>%
     age_at_intime >= 70 ~ "70+"
   ))
 
-ggplot(mimic_icu_cohort, aes(x = age_group, y = los, fill = age_group)) +
+ggplotmimic_icu_cohort, aes(x = age_group, y = los, fill = age_group)) +
   geom_boxplot() +
   labs(title = "Length of ICU Stay by Age Group",
        x = "Age Group",

@@ -24,15 +24,15 @@ library(glmnet)
 library(xgboost)
 library(doParallel)
 library(pROC) 
-library(corr)
+library(corrr)
 library(ggfocus)
 library(caret)
+library(e1071)
+library(randomForest)
+library(ranger)
+
 ```
 
-
-```{r}
-library(kerastuneR) 
-```
 
 ## Predicting ICU duration
 
@@ -119,7 +119,7 @@ head(test_data)
 ```{r}
 set.seed(203)  # Ensure reproducibility
 
-train_sampled <- train_data %>% sample_frac(1.0) entire model
+train_sampled <- train_data %>% sample_frac(0.20) 
 
 # Convert categorical variables to dummy variables and remove the response variable
 train_x <- model.matrix(los_long ~ . - 1, data = train_sampled)  # Remove intercept
@@ -127,12 +127,7 @@ train_y <- as.numeric(as.character(train_sampled$los_long))  # Convert factor to
 
 test_x <- model.matrix(los_long ~ . - 1, data = test_data)
 test_y <- as.numeric(as.character(test_data$los_long))
-```
 
-
-More Preprocessing: 
-
-```{r}
 registerDoParallel(cores = parallel::detectCores() - 1)  
 set.seed(123)
 
@@ -206,27 +201,203 @@ plot(roc_curve, col = "blue", main = "ROC Curve for Logistic Regression with ENE
 abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line (random classifier)
 
 ```
+
 #Approach 2: XG Boosting 
 ```{r}
+set.seed(203)  # Ensure reproducibility
 
+# Sample only 25% of the training data
+train_sampled <- train_data %>% sample_frac(0.20)
+
+# Convert categorical variables to dummy variables
+train_x <- model.matrix(los_long ~ . - 1, data = train_sampled)  # Remove intercept
+test_x <- model.matrix(los_long ~ . - 1, data = test_data)
+
+# Convert target variable to numeric format (XGBoost requires numeric encoding)
+train_y <- as.numeric(as.character(train_sampled$los_long))  # 0 or 1
+test_y <- as.numeric(as.character(test_data$los_long))    # 0 or 1
+
+
+# Convert to XGBoost DMatrix format
+dtrain <- xgb.DMatrix(data = train_x, label = train_y)
+dtest <- xgb.DMatrix(data = test_x, label = test_y)
+
+
+registerDoParallel(cores = parallel::detectCores() - 1)  # Use all but one core
+
+set.seed(123)
+
+# Define tuning grid (21 combinations)
+tuning_grid <- expand.grid(
+  eta = seq(0.01, 0.3, length.out = 3),  # Learning rate
+  max_depth = c(3, 5, 7),  # Tree depth
+  min_child_weight = c(1, 3, 5),  # Minimum sum of instance weight (hessian)
+  subsample = c(0.6, 0.8, 1),  # Subsample ratio
+  colsample_bytree = c(0.6, 0.8, 1)  # Column sample by tree
+)
+
+# Randomly sample 21 parameter combinations
+tuning_grid <- tuning_grid[sample(1:nrow(tuning_grid), 21), ]
+
+
+cv_results <- list()
+
+for (i in 1:nrow(tuning_grid)) {
+  params <- list(
+    booster = "gbtree",
+    objective = "binary:logistic",
+    eval_metric = "auc",
+    eta = tuning_grid$eta[i],
+    max_depth = tuning_grid$max_depth[i],
+    min_child_weight = tuning_grid$min_child_weight[i],
+    subsample = tuning_grid$subsample[i],
+    colsample_bytree = tuning_grid$colsample_bytree[i]
+  )
+
+  # 5-fold cross-validation
+  cv_model <- xgb.cv(params = params, data = dtrain, nrounds = 100, 
+                      nfold = 5, early_stopping_rounds = 10, maximize = TRUE, 
+                      verbose = FALSE, parallel = TRUE)
+
+  # Store results
+  best_iteration <- cv_model$best_iteration
+  best_auc <- max(cv_model$evaluation_log$test_auc_mean)
+  
+  cv_results[[i]] <- c(tuning_grid[i, ], best_iteration = best_iteration, AUC = best_auc)
+}
+
+# Convert results list to dataframe
+cv_results_df <- do.call(rbind, lapply(cv_results, as.data.frame))
+
+# Find the best combination based on AUC
+best_params <- cv_results_df[which.max(cv_results_df$AUC), ]
+print(best_params)
+
+final_params <- list(
+  booster = "gbtree",
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  eta = best_params$eta,
+  max_depth = best_params$max_depth,
+  min_child_weight = best_params$min_child_weight,
+  subsample = best_params$subsample,
+  colsample_bytree = best_params$colsample_bytree
+)
+
+final_model <- xgb.train(params = final_params, data = dtrain, 
+                         nrounds = best_params$best_iteration, 
+                         watchlist = list(train = dtrain, test = dtest), 
+                         early_stopping_rounds = 10, verbose = FALSE)
+
+# Predict probabilities
+test_predictions <- predict(final_model, newdata = dtest)
+
+# Optimize threshold using Youden’s Index
+roc_curve <- roc(test_y, test_predictions)
+best_threshold <- coords(roc_curve, "best", ret = "threshold")
+
+# Convert probabilities to binary predictions
+test_pred_labels <- ifelse(test_predictions > best_threshold, 1, 0)
+
+print(conf_matrix)
+print(paste("Test Accuracy:", round(accuracy, 3)))
+
+# Compute AUC
+auc_score <- auc(roc_curve)
+print(paste("AUC Score:", round(auc_score, 3)))
+
+# Plot ROC Curve
+plot(roc_curve, col = "blue", main = "ROC Curve for XGBoost Model")
+abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal reference line
 ```
 
-
-
-
-
-
-
-
-
-
+#Approach 3: 
 
 ```{r}
+set.seed(203)
+
+# Reduce training size to 15% for faster computation
+train_sampled <- train_data %>% sample_frac(0.15)
+
+# Convert categorical variables to factors
+train_sampled <- train_sampled %>%
+  mutate(across(where(is.character), as.factor))
+
+test_data <- test_data %>%
+  mutate(across(where(is.character), as.factor))
+
+# Ensure target variable is a factor
+train_sampled$los_long <- factor(train_sampled$los_long, levels = c(0, 1), labels = c("Class0", "Class1"))
+test_data$los_long <- factor(test_data$los_long, levels = c(0, 1), labels = c("Class0", "Class1"))
+
+# Parallel Processing
+registerDoParallel(cores = parallel::detectCores() - 1)
+
+set.seed(123)
+
+# Define tuning grid with `mtry`, `splitrule`, and `min.node.size`
+tuning_grid <- expand.grid(
+  mtry = seq(2, floor(log2(ncol(train_sampled) - 1)), by = 2),  # Selects optimal features per split
+  splitrule = c("gini", "extratrees"),  # Different splitting criteria
+  min.node.size = c(1, 5, 10)  # Minimum observations per terminal node
+)
+
+# Use 3-Fold Cross-Validation for Faster Training
+cv_control <- trainControl(method = "cv", number = 3,  
+                           summaryFunction = twoClassSummary, 
+                           classProbs = TRUE, 
+                           allowParallel = TRUE)
+
+# Train Random Forest with `ranger` for speed
+rf_model <- train(los_long ~ ., data = train_sampled,
+                  method = "ranger",  # Use ranger instead of randomForest
+                  trControl = cv_control,
+                  tuneGrid = tuning_grid,
+                  metric = "ROC")
+
+# Print best hyperparameters
+print(rf_model$bestTune)
+
+# Train Final Model with Optimized Parameters
+final_rf <- ranger(los_long ~ ., data = train_sampled, 
+                   mtry = rf_model$bestTune$mtry, 
+                   splitrule = rf_model$bestTune$splitrule,
+                   min.node.size = rf_model$bestTune$min.node.size,
+                   num.trees = 200,  # Reduce trees for speed
+                   importance = "impurity", 
+                   probability = TRUE, 
+                   num.threads = parallel::detectCores() - 1)  # Use all CPU cores
+
+# Predict probabilities
+test_predictions <- predict(final_rf, test_data, type = "response")$predictions[,2]
+
+# Optimize threshold using Youden’s Index
+roc_curve <- roc(test_data$los_long, test_predictions)
+best_threshold <- coords(roc_curve, "best", ret = "threshold")
+
+# Convert probabilities to binary predictions
+test_pred_labels <- ifelse(test_predictions > best_threshold, "Class1", "Class0")
+
+# Confusion Matrix & Performance Metrics
+conf_matrix <- table(Predicted = test_pred_labels, Actual = test_data$los_long)
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+
+print(conf_matrix)
+print(paste("Test Accuracy:", round(accuracy, 3)))
+
+# Compute AUC
+auc_score <- auc(roc_curve)
+print(paste("AUC Score:", round(auc_score, 3)))
+
+# Plot ROC Curve
+plot(roc_curve, col = "blue", main = "ROC Curve for Optimized Random Forest")
+abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal reference line
+
+# Feature Importance
+importance(final_rf)
+
 
 ```
-
-
-
 
 
 
@@ -234,6 +405,11 @@ abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line (random classifi
 
 4. Compare model classification performance on the test set. Report both the area under ROC curve and accuracy for each machine learning algorithm and the model stacking. Interpret the results. What are the most important features in predicting long ICU stays? How do the models compare in terms of performance and interpretability?
 
+Model #1: 
+
+Model #2: XG Boosting 
+
+Model #3: 
 
 
 1. 

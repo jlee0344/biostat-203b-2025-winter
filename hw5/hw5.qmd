@@ -13,29 +13,231 @@ format:
     code-fold: false
 ---
 
+Loading all necessary packages
+
+```{r}
+library(rsample)
+library(tidymodels)
+library(xgboost)
+library(kernlab)
+library(glmnet)  
+library(xgboost)
+library(doParallel)
+library(pROC) 
+library(corr)
+library(ggfocus)
+library(caret)
+```
+
+
+```{r}
+library(kerastuneR) 
+```
+
 ## Predicting ICU duration
 
 Using the ICU cohort `mimiciv_icu_cohort.rds` you built in Homework 4, develop at least three machine learning approaches (logistic regression with enet regularization, random forest, boosting, SVM, MLP, etc) plus a model stacking approach for predicting whether a patient's ICU stay will be longer than 2 days. You should use the `los_long` variable as the outcome. You algorithms can use patient demographic information (gender, age at ICU `intime`, marital status, race), ICU admission information (first care unit), the last lab measurements before the ICU stay, and first vital measurements during ICU stay as features. You are welcome to use any feature engineering techniques you think are appropriate; but make sure to not use features that are not available at an ICU stay's `intime`. For instance, `last_careunit` cannot be used in your algorithms. 
 
 1. Data preprocessing and feature engineering.
 
-2. Partition data into 50% training set and 50% test set. Stratify partitioning according to `los_long`. For grading purpose, sort the data by `subject_id`, `hadm_id`, and `stay_id` and use the seed `203` for the initial data split. Below is the sample code.
 ```{r}
-#| eval: false
+mimiciv_icu_cohort <- readRDS("../hw4/mimiciv_shiny/mimic_icu_cohort.rds")
+```
+
+**Data Preprocessing and Feature Engineering Explanation: ** 
+
+We began our data preprocessing by creating a new binary variable, los_long, which is set to TRUE when a patient's length of stay (los) is greater than or equal to two days. To handle missing data, we converted categorical variables into factors and applied median imputation for missing numerical values and mode imputation for missing categorical values. For feature selection, we included patient demographic information (gender, age at ICU admission, marital status, race), ICU admission details (first care unit), the last recorded laboratory measurements prior to ICU admission, and the first recorded vital signs during the ICU stay—both of which were extracted from previous reports. To ensure consistency and improve model performance, we standardized all continuous variables. Additionally, categorical variables were converted into factors to facilitate proper encoding for machine learning models. This structured preprocessing ensures that the dataset is well-prepared for predictive modeling while avoiding data leakage by only incorporating information available at the time of ICU admission. Note that there are 18 total features used in the model to predict the whether a patient's lengt of stay will be greater than or equal to 2 days. Note that we will include subject_id, hadm_id, and stay_id for grading purposes only but will remove them as features for the model in future steps. 
+
+
+```{r}
+# Begin preprocessing by creating binary outcome variable 'los_long'
+mimiciv_icu_cohort <- mimiciv_icu_cohort %>%
+  filter(!is.na(los)) %>% 
+  mutate(
+    los_long = as.factor(as.integer(los >= 2))  # Convert directly to factor (1 = TRUE, 0 = FALSE)
+  ) %>%
+  select(subject_id, hadm_id, stay_id, los_long,
+         gender, age_at_intime, marital_status, race, first_careunit,
+         heart_rate, non_invasive_blood_pressure_systolic, non_invasive_blood_pressure_diastolic,
+         respiratory_rate, temperature_fahrenheit, bicarbonate, glucose,
+         potassium, sodium, chloride, creatinine, hematocrit, wbc) %>%
+  
+  # Convert categorical variables into factors and handle missing values using mode imputation
+  mutate(across(c(gender, marital_status, race, first_careunit), 
+                ~ replace_na(.x, names(sort(table(.x), decreasing = TRUE))[1])),
+         across(c(gender, marital_status, race, first_careunit), factor)) %>%
+
+  # Median imputation for numeric variables
+  mutate(across(c(age_at_intime, heart_rate, non_invasive_blood_pressure_systolic,
+                  non_invasive_blood_pressure_diastolic, respiratory_rate,
+                  temperature_fahrenheit, bicarbonate, glucose, potassium,
+                  sodium, chloride, creatinine, hematocrit, wbc),
+                ~ if_else(is.na(.x), median(.x, na.rm = TRUE), .x))) %>%
+
+  # Standardize continuous numerical variables
+  mutate(across(c(age_at_intime, heart_rate, non_invasive_blood_pressure_systolic,
+                  non_invasive_blood_pressure_diastolic, respiratory_rate,
+                  temperature_fahrenheit, bicarbonate, glucose, potassium,
+                  sodium, chloride, creatinine, hematocrit, wbc),
+                ~ as.numeric(scale(.x))))
+
+
+mimiciv_icu_cohort
+```
+
+2. Partition data into 50% training set and 50% test set. Stratify partitioning according to `los_long`. For grading purpose, sort the data by `subject_id`, `hadm_id`, and `stay_id` and use the seed `203` for the initial data split. Below is the sample code.
+
+```{r}
 set.seed(203)
 
-# sort
-mimiciv_icu_cohort <- mimiciv_icu_cohort |>
+mimiciv_icu_cohort <- mimiciv_icu_cohort %>%
   arrange(subject_id, hadm_id, stay_id)
 
-data_split <- initial_split(
-  mimiciv_icu_cohort, 
-  # stratify by los_long
-  strata = "los_long", 
-  prop = 0.5
-  )
+# Perform stratified data splitting (50% train, 50% test)
+data_split <- initial_split(mimiciv_icu_cohort, prop = 0.5, strata = los_long)
+
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+# Remove subject_id, hadm_id, and stay_id from train and test sets
+train_data <- train_data %>%
+  select(-subject_id, -hadm_id, -stay_id)
+
+test_data <- test_data %>%
+  select(-subject_id, -hadm_id, -stay_id)
+
+# Display the first few rows of train and test sets
+head(train_data)
+head(test_data)
 ```
+
 
 3. Train and tune the models using the training set.
 
+#Approach 1: Logistic Regression 
+
+```{r}
+set.seed(203)  # Ensure reproducibility
+
+train_sampled <- train_data %>% sample_frac(1.0) entire model
+
+# Convert categorical variables to dummy variables and remove the response variable
+train_x <- model.matrix(los_long ~ . - 1, data = train_sampled)  # Remove intercept
+train_y <- as.numeric(as.character(train_sampled$los_long))  # Convert factor to numeric (0,1)
+
+test_x <- model.matrix(los_long ~ . - 1, data = test_data)
+test_y <- as.numeric(as.character(test_data$los_long))
+```
+
+
+More Preprocessing: 
+
+```{r}
+registerDoParallel(cores = parallel::detectCores() - 1)  
+set.seed(123)
+
+# Define grid of tuning parameters
+alpha_values <- seq(0, 1, length.out = 25)  # Alpha (L1 ratio)
+lambda_values <- 10^seq(-4, 1, length.out = 10)  # Lambda (regularization)
+
+# Generate 250 (25 x 10) parameter combinations
+tuning_grid <- expand.grid(alpha = alpha_values, lambda = lambda_values)
+
+# Initialize storage for results
+cv_results <- list()
+
+# Iterate through each alpha-lambda combination
+for (i in 1:nrow(tuning_grid)) {
+  alpha_i <- tuning_grid$alpha[i]
+  lambda_i <- tuning_grid$lambda[i]
+  
+  # Perform 5-fold cross-validation
+  cv_fit <- cv.glmnet(x = train_x, 
+                       y = train_y, 
+                       family = "binomial",
+                       alpha = alpha_i, 
+                       lambda = lambda_values, 
+                       nfolds = 5,
+                       parallel = TRUE) 
+  
+  # Store results
+  cv_results[[i]] <- list(alpha = alpha_i, lambda = cv_fit$lambda.min, error = min(cv_fit$cvm))
+}
+
+# Convert list to dataframe
+cv_results_df <- do.call(rbind, lapply(cv_results, as.data.frame))
+
+# Find the best combination (lowest cross-validation error)
+best_params <- cv_results_df[which.min(cv_results_df$error), ]
+best_alpha <- best_params$alpha
+best_lambda <- best_params$lambda
+
+print(best_params)
+final_model <- glmnet(x = train_x, 
+                      y = train_y, 
+                      family = "binomial",
+                      alpha = best_alpha, 
+                      lambda = best_lambda)
+
+# Predict on the test set
+test_predictions <- predict(final_model, newx = test_x, type = "response")
+
+# Convert probabilities to binary predictions
+test_pred_labels <- ifelse(test_predictions > 0.5, 1, 0)
+
+# Evaluate model performance
+conf_matrix <- table(Predicted = test_pred_labels, Actual = test_y)
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+
+print(conf_matrix)
+print(paste("Test Accuracy:", round(accuracy, 3)))
+
+# Compute ROC Curve
+roc_curve <- roc(test_y, test_predictions)  # test_predictions are probabilities
+
+# Calculate AUC
+auc_score <- auc(roc_curve)
+
+# Print AUC Score
+print(paste("AUC Score:", round(auc_score, 3)))
+
+# Plot ROC Curve
+plot(roc_curve, col = "blue", main = "ROC Curve for Logistic Regression with ENET")
+abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line (random classifier)
+
+```
+#Approach 2: XG Boosting 
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
 4. Compare model classification performance on the test set. Report both the area under ROC curve and accuracy for each machine learning algorithm and the model stacking. Interpret the results. What are the most important features in predicting long ICU stays? How do the models compare in terms of performance and interpretability?
+
+
+
+1. 
+
+
+
+

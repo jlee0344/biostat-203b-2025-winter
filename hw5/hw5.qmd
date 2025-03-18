@@ -114,12 +114,12 @@ head(test_data)
 
 3. Train and tune the models using the training set.
 
-#Approach 1: Logistic Regression 
+#Approach 1: Logistic Regression with e-net regularization 
 
 ```{r}
 set.seed(203)  # Ensure reproducibility
 
-train_sampled <- train_data %>% sample_frac(0.20) 
+train_sampled <- train_data %>% sample_frac(1.0) 
 
 # Convert categorical variables to dummy variables and remove the response variable
 train_x <- model.matrix(los_long ~ . - 1, data = train_sampled)  # Remove intercept
@@ -207,7 +207,7 @@ abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line (random classifi
 set.seed(203)  # Ensure reproducibility
 
 # Sample only 25% of the training data
-train_sampled <- train_data %>% sample_frac(0.20)
+train_sampled <- train_data %>% sample_frac(1.0)
 
 # Convert categorical variables to dummy variables
 train_x <- model.matrix(los_long ~ . - 1, data = train_sampled)  # Remove intercept
@@ -313,91 +313,6 @@ abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal reference line
 
 #Approach 3: 
 
-```{r}
-set.seed(203)
-
-# Reduce training size to 15% for faster computation
-train_sampled <- train_data %>% sample_frac(0.15)
-
-# Convert categorical variables to factors
-train_sampled <- train_sampled %>%
-  mutate(across(where(is.character), as.factor))
-
-test_data <- test_data %>%
-  mutate(across(where(is.character), as.factor))
-
-# Ensure target variable is a factor
-train_sampled$los_long <- factor(train_sampled$los_long, levels = c(0, 1), labels = c("Class0", "Class1"))
-test_data$los_long <- factor(test_data$los_long, levels = c(0, 1), labels = c("Class0", "Class1"))
-
-# Parallel Processing
-registerDoParallel(cores = parallel::detectCores() - 1)
-
-set.seed(123)
-
-# Define tuning grid with `mtry`, `splitrule`, and `min.node.size`
-tuning_grid <- expand.grid(
-  mtry = seq(2, floor(log2(ncol(train_sampled) - 1)), by = 2),  # Selects optimal features per split
-  splitrule = c("gini", "extratrees"),  # Different splitting criteria
-  min.node.size = c(1, 5, 10)  # Minimum observations per terminal node
-)
-
-# Use 3-Fold Cross-Validation for Faster Training
-cv_control <- trainControl(method = "cv", number = 3,  
-                           summaryFunction = twoClassSummary, 
-                           classProbs = TRUE, 
-                           allowParallel = TRUE)
-
-# Train Random Forest with `ranger` for speed
-rf_model <- train(los_long ~ ., data = train_sampled,
-                  method = "ranger",  # Use ranger instead of randomForest
-                  trControl = cv_control,
-                  tuneGrid = tuning_grid,
-                  metric = "ROC")
-
-# Print best hyperparameters
-print(rf_model$bestTune)
-
-# Train Final Model with Optimized Parameters
-final_rf <- ranger(los_long ~ ., data = train_sampled, 
-                   mtry = rf_model$bestTune$mtry, 
-                   splitrule = rf_model$bestTune$splitrule,
-                   min.node.size = rf_model$bestTune$min.node.size,
-                   num.trees = 200,  # Reduce trees for speed
-                   importance = "impurity", 
-                   probability = TRUE, 
-                   num.threads = parallel::detectCores() - 1)  # Use all CPU cores
-
-# Predict probabilities
-test_predictions <- predict(final_rf, test_data, type = "response")$predictions[,2]
-
-# Optimize threshold using Youden’s Index
-roc_curve <- roc(test_data$los_long, test_predictions)
-best_threshold <- coords(roc_curve, "best", ret = "threshold")
-
-# Convert probabilities to binary predictions
-test_pred_labels <- ifelse(test_predictions > best_threshold, "Class1", "Class0")
-
-# Confusion Matrix & Performance Metrics
-conf_matrix <- table(Predicted = test_pred_labels, Actual = test_data$los_long)
-accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
-
-print(conf_matrix)
-print(paste("Test Accuracy:", round(accuracy, 3)))
-
-# Compute AUC
-auc_score <- auc(roc_curve)
-print(paste("AUC Score:", round(auc_score, 3)))
-
-# Plot ROC Curve
-plot(roc_curve, col = "blue", main = "ROC Curve for Optimized Random Forest")
-abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal reference line
-
-# Feature Importance
-importance(final_rf)
-
-
-```
 
 
 

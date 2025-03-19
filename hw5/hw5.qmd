@@ -204,7 +204,7 @@ nrow(test_data)
 
 3. Train and tune the models using the training set.
 
-#Approach 1: Logistic Regression with e-net regularization
+#Machine Learning Approach 1: Logistic Regression with e-net regularization
 
 Analysis: Our first machine learning approach employs logistic regression with elastic net (ENet) regularization to predict ICU length of stay, optimizing hyperparameters through cross-validation. We started with more data preprocessing suitable for running a logistic regression model by converting categorical variables into dummy variables and splitting the dataset into training and testing sets. The model was then trained over a grid of alpha (L1 ratio) and lambda (regularization strength) values, with the best hyperparameters (alpha = 0.375, lambda = 0.0013) selected based on the lowest cross-validation error (1.3478). It is important to note that elastic net regularization combines L1 (Lasso) for feature selection and L2 (Ridge) to reduce multicollinearity. 
 
@@ -309,7 +309,14 @@ plot(roc_curve, col = "blue", main = "ROC Curve for Logistic Regression")
 abline(a = 0, b = 1, lty = 2, col = "red")
 ```
 
-#Approach 2: XG Boosting 
+#Machine Learning Approach 2: XG Boosting Classification Model 
+
+Analysis: Our second machine learning approach implements an XGBoost classification model to predict ICU length of stay, utilizing hyperparameter tuning and cross-validation for optimization. Again, we preprocess our mimiciv_icu_cohort dataset where categorical variables are converted into dummy variables, and the response variable (los_long) is formatted as a binary numeric variable (0 or 1). We then transform out data into XGBoost’s DMatrix format to enhance computational efficiency. Hyperparameter tuning is conducted through a grid search, testing key parameters such as learning rate (eta), tree depth, minimum child weight, subsampling, and column sampling across 21 randomly sampled combinations. A 5-fold cross-validation strategy identifies the best model based on the highest AUC score and optimal iteration count, with early stopping is applied to prevent overfitting. 
+
+
+The final model is trained using the best hyperparameters, and predictions are evaluated with a confusion matrix, test accuracy, and AUC score. The results are presented using Kaggle-style tables, a confusion matrix heatmap via ggplot2, and a ROC curve to assess model performance. This structured approach ensures efficient optimization, robust evaluation, and clear model interpretability for ICU stay prediction.
+
+Results: 
 
 ```{r}
 set.seed(203) 
@@ -340,7 +347,6 @@ tuning_grid <- expand.grid(
 
 # Randomly sample 21 parameter combinations
 tuning_grid <- tuning_grid[sample(1:nrow(tuning_grid), 21), ]
-
 
 cv_results <- list()
 
@@ -413,14 +419,14 @@ plot(roc_curve, col = "blue", main = "ROC Curve for XGBoost Model")
 abline(a = 0, b = 1, lty = 2, col = "red")  
 ```
 
-#Approach 3: Random Forest 
+#Machine Learning Approach 3: Random Forest 
 
 ```{r}
 # Set seed for reproducibility
 set.seed(203)
 
 # Sample only 20% of the training data to reduce computation time
-train_sampled <- train_data %>% sample_frac(0.10) 
+train_sampled <- train_data %>% sample_frac(1.0) 
 
 # Convert categorical variables to factors
 train_sampled <- train_sampled %>% mutate(across(where(is.character), as.factor))
@@ -458,8 +464,6 @@ rf_model <- train(
   metric = "ROC"
 )
 
-# Print best hyperparameters
-print(rf_model$bestTune)
 
 # Train final optimized model with best hyperparameters
 final_rf <- ranger(
@@ -476,8 +480,6 @@ final_rf <- ranger(
 # Predict probabilities on test set
 rf_pred <- predict(final_rf, test_data, type = "response")
 
-# DEBUG: Check structure of rf_pred
-print(str(rf_pred))
 
 # Ensure predictions are extracted correctly
 if ("predictions" %in% names(rf_pred)) {
@@ -487,53 +489,87 @@ if ("predictions" %in% names(rf_pred)) {
     }
 }
 
-# Ensure test_predictions is a vector
-test_predictions <- as.numeric(test_predictions)
-print(length(test_predictions))  # Should be same as nrow(test_data)
 
-# Optimize threshold using Youden’s Index
+
+
+# Convert probabilities to binary predictions
 roc_curve <- roc(test_data$los_long, test_predictions)
 best_threshold <- coords(roc_curve, "best", ret = "threshold")
 
-
-
 # Ensure best_threshold is numeric
 best_threshold <- as.numeric(best_threshold[1])
-print(best_threshold)  # Should be a single value
 
-# Convert probabilities to binary predictions
 test_pred_labels <- ifelse(test_predictions > best_threshold, "Class1", "Class0")
 
-# Ensure test_pred_labels is a character vector
-test_pred_labels <- as.character(test_pred_labels)
-print(length(test_pred_labels))  # Must be 47223
-
-# Ensure test_pred_labels is a factor with correct levels
+# Ensure test_pred_labels is a factor
 test_pred_labels <- factor(test_pred_labels, levels = c("Class0", "Class1"))
 test_data$los_long <- factor(test_data$los_long, levels = c("Class0", "Class1"))
-
-# Debug length check before confusion matrix
-print(length(test_pred_labels))  # Must be 47223
-print(length(test_data$los_long))  # Must be 47223
 
 # Compute Confusion Matrix & Performance Metrics
 conf_matrix <- table(Predicted = test_pred_labels, Actual = test_data$los_long)
 accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
-
-# Print Results
-print(conf_matrix)
-print(paste("Test Accuracy:", round(accuracy, 3)))
-
-# Compute AUC
 auc_score <- auc(roc_curve)
-print(paste("AUC Score:", round(auc_score, 3)))
 
-# Plot ROC Curve
-plot(roc_curve, col = "blue", main = "ROC Curve for Optimized Random Forest")
-abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal reference line
+# Display Test Accuracy & AUC Score in a Kaggle-style table
+results_table <- data.frame(
+  Metric = c("Test Accuracy", "AUC Score"),
+  Value = c(round(accuracy, 3), round(auc_score, 3))
+)
 
-# Feature Importance
-print(importance(final_rf))  # Display feature importance scores
+results_table %>%
+  gt() %>%
+  tab_header(title = "Model Performance Metrics") %>%
+  fmt_number(columns = Value, decimals = 3)
+
+# Convert confusion matrix to dataframe for ggplot
+conf_matrix_df <- as.data.frame.matrix(conf_matrix)
+
+# Ensure correct row and column names
+colnames(conf_matrix_df) <- c("Predicted 0", "Predicted 1")
+rownames(conf_matrix_df) <- c("Actual 0", "Actual 1")
+
+# Reshape for ggplot
+conf_matrix_long <- conf_matrix_df %>%
+  rownames_to_column(var = "Actual") %>%  
+  pivot_longer(cols = -Actual, names_to = "Predicted", values_to = "Freq")
+
+# Plot confusion matrix as a heatmap
+ggplot(conf_matrix_long, aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient(low = "white", high = "blue") +
+  geom_text(aes(label = Freq), color = "black", size = 6) +
+  labs(
+    title = "Confusion Matrix",
+    x = "Predicted",
+    y = "Actual"
+  ) +
+  theme_minimal()
+
+
+# Extract Feature Importance Correctly for ranger
+feature_importance <- as.data.frame(importance(final_rf))
+feature_importance$Feature <- rownames(feature_importance)
+
+# Rename importance column properly
+colnames(feature_importance)[1] <- "Importance_Score"
+
+# Arrange in descending order
+feature_importance <- feature_importance %>%
+  arrange(desc(Importance_Score)) %>%
+  head(10)  # Select top 10 features
+
+# Display Feature Importance in Kaggle-Style Table
+feature_importance %>%
+  gt() %>%
+  tab_header(title = "Top 10 Most Important Features") %>%
+  fmt_number(columns = Importance_Score, decimals = 4) %>%
+  cols_label(
+    Feature = "Feature Name",
+    Importance_Score = "Feature Importance Score"
+  )
+
+plot(roc_curve, col = "blue", main = "ROC Curve for Random Forest Model")
+abline(a = 0, b = 1, lty = 2, col = "red")
 ```
 
 4. Compare model classification performance on the test set. Report both the area under ROC curve and accuracy for each machine learning algorithm and the model stacking. Interpret the results. What are the most important features in predicting long ICU stays? How do the models compare in terms of performance and interpretability?
@@ -544,6 +580,11 @@ Model #2: XG Boosting
 
 Model #3: 
 
+
+
+A summary table of comparing the accuracy percentages and AUC scores are displayed below for each machine learning approach: 
+
+Using random forest, the most important featuresin predicting long ICU stays include: 
 
 
 

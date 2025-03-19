@@ -379,8 +379,23 @@ cv_results_df <- do.call(rbind, lapply(cv_results, as.data.frame))
 
 # Find the best combination based on AUC
 best_params <- cv_results_df[which.max(cv_results_df$AUC), ]
-print(best_params)
 
+# Display Best Hyperparameters in Kaggle-Style Table
+best_params %>%
+  gt() %>%
+  tab_header(title = "Best Hyperparameters for XGBoost") %>%
+  fmt_number(columns = c(eta, max_depth, min_child_weight, subsample, colsample_bytree, best_iteration, AUC), decimals = 4) %>%
+  cols_label(
+    eta = "Learning Rate",
+    max_depth = "Max Depth",
+    min_child_weight = "Min Child Weight",
+    subsample = "Subsample Ratio",
+    colsample_bytree = "Column Sample by Tree",
+    best_iteration = "Best Iteration",
+    AUC = "Best CV AUC"
+  )
+
+# Train final XGBoost model with the best hyperparameters
 final_params <- list(
   booster = "gbtree",
   objective = "binary:logistic",
@@ -397,26 +412,56 @@ final_model <- xgb.train(params = final_params, data = dtrain,
                          watchlist = list(train = dtrain, test = dtest), 
                          early_stopping_rounds = 10, verbose = FALSE)
 
-# Predict probabilities
+# Make Predictions
 test_predictions <- predict(final_model, newdata = dtest)
 
 # Optimize threshold using Youden’s Index
 roc_curve <- roc(test_y, test_predictions)
 best_threshold <- coords(roc_curve, "best", ret = "threshold")
+best_threshold <- as.numeric(best_threshold[1])
 
 # Convert probabilities to binary predictions
 test_pred_labels <- ifelse(test_predictions > best_threshold, 1, 0)
 
-print(conf_matrix)
-print(paste("Test Accuracy:", round(accuracy, 3)))
-
-# Compute AUC
+# Compute Confusion Matrix & Performance Metrics
+conf_matrix <- table(Predicted = test_pred_labels, Actual = test_y)
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
 auc_score <- auc(roc_curve)
-print(paste("AUC Score:", round(auc_score, 3)))
+
+# Display Test Accuracy & AUC Score in Kaggle-Style Table
+results_table <- data.frame(
+  Metric = c("Test Accuracy", "AUC Score"),
+  Value = c(round(accuracy, 3), round(auc_score, 3))
+)
+
+results_table %>%
+  gt() %>%
+  tab_header(title = "Model Performance Metrics") %>%
+  fmt_number(columns = Value, decimals = 3)
+
+# Convert Confusion Matrix to Dataframe for ggplot
+conf_matrix_df <- as.data.frame.matrix(conf_matrix)
+
+# Reshape for ggplot
+conf_matrix_long <- conf_matrix_df %>%
+  rownames_to_column(var = "Actual") %>%  
+  pivot_longer(cols = -Actual, names_to = "Predicted", values_to = "Freq")
+
+# Plot Confusion Matrix as Heatmap
+ggplot(conf_matrix_long, aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient(low = "white", high = "blue") +
+  geom_text(aes(label = Freq), color = "black", size = 6) +
+  labs(
+    title = "Confusion Matrix",
+    x = "Predicted",
+    y = "Actual"
+  ) +
+  theme_minimal()
 
 # Plot ROC Curve
 plot(roc_curve, col = "blue", main = "ROC Curve for XGBoost Model")
-abline(a = 0, b = 1, lty = 2, col = "red")  
+abline(a = 0, b = 1, lty = 2, col = "red")
 ```
 
 #Machine Learning Approach 3: Random Forest 
@@ -488,9 +533,6 @@ if ("predictions" %in% names(rf_pred)) {
         test_predictions <- test_predictions[, "Class1", drop = TRUE]  # Extract correct column
     }
 }
-
-
-
 
 # Convert probabilities to binary predictions
 roc_curve <- roc(test_data$los_long, test_predictions)

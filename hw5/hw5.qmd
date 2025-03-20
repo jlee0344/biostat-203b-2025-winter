@@ -614,7 +614,7 @@ model_comparison %>%
 
 **10 Most Important Features ** 
 
-The table presents the top 10 most important features influencing the Random Forest model's predictions for ICU length of stay. The most significant feature is systolic non-invasive blood pressure (importance score: 2,346.97), indicating its strong predictive value. Other important features include heart rate (2,264.77), hematocrit levels (2,228.56), and white blood cell (WBC) count (2,192.23), all of which play essential roles in patient stability and health status. Additionally, age at ICU admission (2,132.81) and temperature (2,070.43) contribute significantly to predictions, suggesting that both physiological and demographic factors influence ICU stay duration. Other important features include respiratory rate (1,966.11), creatinine (1,633.25), chloride (1,599.86), and sodium (1,571.78).
+The table presents the top 10 most important features influencing the Random Forest model's predictions for ICU length of stay. The most significant feature is systolic non-invasive blood pressure (importance score: 2,346.97), indicating its strong predictive value. Other important features include heart rate (2,264.77), hematocrit levels (2,228.56), and white blood cell (WBC) count (2,192.23), all of which play essential roles in patient stability and health status. Additionally, age at ICU admission (2,132.81) and temperature (2,070.43) contribute significantly to predictions, suggesting that both physiological and demographic factors influence ICU stay duration. Other important features include respiratory rate (1,966.11), creatinine (1,633.25), chloride (1,599.86), and sodium (1,571.78)
 
 ```{r}
 feature_importance <- as.data.frame(importance(final_rf))

@@ -1,0 +1,637 @@
+---
+title: "Biostat 203B Homework 5"
+subtitle: Due Mar 20 @ 11:59PM
+author: "Julie Lee, 806409381"
+format:
+  html:
+    theme: cosmo
+    embed-resources: true
+    number-sections: false
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    code-fold: false
+---
+
+Loading all necessary packages
+
+```{r}
+library(rsample)
+library(tidymodels)
+library(xgboost)
+library(kernlab)
+library(glmnet)  
+library(xgboost)
+library(doParallel)
+library(pROC) 
+library(corrr)
+library(ggfocus)
+library(caret)
+library(e1071)
+library(randomForest)
+library(ranger)
+library(SuperLearner)
+library(caretEnsemble)
+library(dplyr)
+library(purrr)
+library(ggplot2) 
+library(gt)
+```
+
+
+## Predicting ICU duration
+
+Using the ICU cohort `mimiciv_icu_cohort.rds` you built in Homework 4, develop at least three machine learning approaches (logistic regression with enet regularization, random forest, boosting, SVM, MLP, etc) plus a model stacking approach for predicting whether a patient's ICU stay will be longer than 2 days. You should use the `los_long` variable as the outcome. You algorithms can use patient demographic information (gender, age at ICU `intime`, marital status, race), ICU admission information (first care unit), the last lab measurements before the ICU stay, and first vital measurements during ICU stay as features. You are welcome to use any feature engineering techniques you think are appropriate; but make sure to not use features that are not available at an ICU stay's `intime`. For instance, `last_careunit` cannot be used in your algorithms. 
+
+1. Data preprocessing and feature engineering.
+
+```{r}
+mimiciv_icu_cohort <- readRDS("../hw4/mimiciv_shiny/mimic_icu_cohort.rds")
+```
+
+**Data Preprocessing and Feature Engineering Explanation: ** 
+
+We began our data preprocessing by creating a new binary outcome variable, los_long, which is set to 1 (TRUE) if a patient's length of stay (los) is greater than or equal to two days and 0 (FALSE) otherwise. The dataset was then filtered to remove any patients with missing los values. To prepare the features for modeling, we selected 18 variables, including patient demographics (gender, age at ICU admission, marital status, and race), ICU admission details (first care unit), the last recorded laboratory measurements before ICU admission, and the first recorded vital signs during the ICU stay. To handle missing data, we applied mode imputation (replacing missing categorical values with the most frequent category) for variables such as gender, marital status, race, and first care unit. For numerical variables, we applied median imputation, filling in missing values with the median of each respective column. For consistency and to optimize model performance, all continuous variables were standardized (mean = 0, standard deviation = 1). Finally, categorical variables were converted into factors, ensuring compatibility with machine learning models. To maintain data integrity and avoid data leakage, we only used information available at the time of ICU admission. Additionally, we included the variables subject_id, hadm_id, and stay_id in the model but excluded them as predictive features in later steps.
+
+```{r}
+mimiciv_icu_cohort <- mimiciv_icu_cohort %>%
+  filter(!is.na(los)) %>%
+  mutate(
+    los_long = as.factor(as.integer(los >= 2))  
+  ) %>%
+  select(
+    subject_id, hadm_id, stay_id, los_long, gender, age_at_intime, 
+    marital_status, race, first_careunit, heart_rate, 
+    non_invasive_blood_pressure_systolic, 
+    non_invasive_blood_pressure_diastolic, respiratory_rate, 
+    temperature_fahrenheit, bicarbonate, glucose, potassium, sodium, 
+    chloride, creatinine, hematocrit, wbc
+  ) %>%
+  
+  mutate(
+    across(
+      c(gender, marital_status, race, first_careunit), 
+      ~ replace_na(.x, names(sort(table(.x), decreasing = TRUE))[1])
+    ),
+    across(c(gender, marital_status, race, first_careunit), factor)
+  ) %>%
+  
+  mutate(
+    across(
+      c(age_at_intime, heart_rate, non_invasive_blood_pressure_systolic,
+        non_invasive_blood_pressure_diastolic, respiratory_rate, 
+        temperature_fahrenheit, bicarbonate, glucose, potassium, sodium, 
+        chloride, creatinine, hematocrit, wbc),
+      ~ if_else(is.na(.x), median(.x, na.rm = TRUE), .x)
+    )
+  ) %>%
+
+  mutate(
+    across(
+      c(age_at_intime, heart_rate, non_invasive_blood_pressure_systolic,
+        non_invasive_blood_pressure_diastolic, respiratory_rate, 
+        temperature_fahrenheit, bicarbonate, glucose, potassium, sodium, 
+        chloride, creatinine, hematocrit, wbc),
+      ~ as.numeric(scale(.x))
+    )
+  )
+
+mimiciv_icu_cohort
+```
+
+**More Preprocessing: Identifying the Least significant Categorical Variable in the Dataset**
+
+We further preprocess our dataset by applying the Chi-Square test with Monte Carlo simulation to assess the statistical significance of categorical predictors in relation to ICU length of stay (los_long). We implement a specific function to compute the Chi-Square test with 100,000 Monte Carlo simulations. This test is conducted on the categorical variables gender, marital status, race, and first care unit, with the resulting p-values stored in a dataframe. Based on the analysis, we find that all categorical predictors (marital_status, race, first_careunit, and gender) exhibit statistical significance, and as a result, we decide to retain all of these predictors in our final dataset.
+
+```{r}
+chi_square_test <- function(predictor, target) {
+  tbl <- table(predictor, target)
+  test <- chisq.test(tbl, simulate.p.value = TRUE, B = 100000) 
+  return(test$p.value)
+}
+
+categorical_vars <- mimiciv_icu_cohort %>%
+  select(gender, marital_status, race, first_careunit)
+
+chi_square_results <- map_dbl(
+  categorical_vars, 
+  chi_square_test, 
+  target = mimiciv_icu_cohort$los_long
+)
+
+chi_square_results <- data.frame(
+  predictor = names(chi_square_results),
+  p_value = chi_square_results
+)
+
+chi_square_results <- chi_square_results %>%
+  arrange(p_value)
+
+print(chi_square_results)
+```
+
+**More Preprocessing: Identifying the Least Significant Categorical Variables in the Data Set ** 
+
+To further preprocess our data, we perform an independent t-test to assess the statistical significance of numerical predictors in relation to ICU length of stay (los_long). A function is defined to conduct two-sample t-tests, comparing the distributions of each numerical variable between patients with ICU stays of less than two days (los_long = 0) and those with longer stays (los_long = 1). The test is applied to numerical features, including age at ICU admission, heart rate, blood pressure, respiratory rate, temperature, and various lab measurements. Based on the p-values obtained, we identify glucose, potassium, bicarbonate, and diastolic blood pressure as not statistically significant (p > 0.05). Consequently, these four variables are removed from the final mimiciv_icu_cohort dataset to retain only the most relevant numerical predictors for further modeling. The first few rows of the final dataset that will be utilized for machine learning is shown below. Note that there are a total of 14 predictors used in our final model. We will now conduct 3 different machine learning approaches on this dataset. 
+
+```{r}
+t_test <- function(predictor, target) {
+  group1 <- predictor[target == 0]
+  group2 <- predictor[target == 1]
+  test <- t.test(group1, group2)
+  return(test$p.value)
+}
+
+numerical_vars <- mimiciv_icu_cohort %>%
+  select(
+    age_at_intime, heart_rate, non_invasive_blood_pressure_systolic,
+    non_invasive_blood_pressure_diastolic, respiratory_rate,
+    temperature_fahrenheit, bicarbonate, glucose, potassium, sodium, 
+    chloride, creatinine, hematocrit, wbc
+  )
+
+t_test_results <- map_dbl(
+  numerical_vars, 
+  t_test, 
+  target = as.numeric(as.character(mimiciv_icu_cohort$los_long))
+)
+
+t_test_results <- data.frame(
+  predictor = names(t_test_results),
+  p_value = unname(t_test_results)
+)
+
+
+t_test_results <- t_test_results %>%
+  arrange(p_value)
+
+print(t_test_results)
+
+mimiciv_icu_cohort <- mimiciv_icu_cohort %>%
+  select(
+    -glucose, -potassium, -bicarbonate, 
+    -non_invasive_blood_pressure_diastolic
+  )
+
+head(mimiciv_icu_cohort)
+```
+
+2. Partition data into 50% training set and 50% test set. Stratify partitioning according to `los_long`. For grading purpose, sort the data by `subject_id`, `hadm_id`, and `stay_id` and use the seed `203` for the initial data split. Below is the sample code.
+
+The first few rows of the train_data and test_data are shown below. In addition, we are able to confirm that there are 47221 entries in the traning set while there are 47223 entries in the testing set.
+
+```{r}
+set.seed(203)
+
+mimiciv_icu_cohort <- mimiciv_icu_cohort %>%
+  arrange(subject_id, hadm_id, stay_id)
+
+data_split <- initial_split(mimiciv_icu_cohort, prop = 0.5, strata = los_long)
+
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+train_data <- train_data %>%
+  select(-subject_id, -hadm_id, -stay_id)
+
+test_data <- test_data %>%
+  select(-subject_id, -hadm_id, -stay_id)
+
+head(train_data)
+head(test_data)
+nrow(train_data)
+nrow(test_data)
+```
+
+3. Train and tune the models using the training set.
+
+# Machine Learning Approach 1: Logistic Regression with e-net regularization
+
+Analysis: Our first machine learning approach employs logistic regression with elastic net (ENet) regularization to predict ICU length of stay, optimizing hyperparameters through cross-validation. We started with more data preprocessing suitable for running a logistic regression model by converting categorical variables into dummy variables and splitting the dataset into training and testing sets. The model was then trained over a grid of alpha (L1 ratio) and lambda (regularization strength) values, with the best hyperparameters (alpha = 0.375, lambda = 0.0013) selected based on the lowest cross-validation error (1.3478). It is important to note that elastic net regularization combines L1 (Lasso) for feature selection and L2 (Ridge) to reduce multicollinearity. 
+
+In addition, hyperparameter tuning was conducted using a grid search strategy over a predefined range of alpha and lambda values. The alpha parameter was varied from 0 to 1 in 25 evenly spaced increments. The lambda parameter was varied across a logarithmic scale from 10⁻⁴ to 10¹ (0.0001 to 10) to control the strength of regularization. We also used 5-fold cross-validation during tuning, where the dataset was divided into five subsets, and the model was trained and validated iteratively on different splits. The combination of alpha and lambda that produced the lowest cross-validation error was selected as the optimal set of hyperparameters as shown in the Kaggle table.
+
+Results: The confusion matrix reveals a moderate prediction imbalance, with the model correctly classifying 15,582 short ICU stays but misclassifying 11,452 as long stays, while among actual long stays, 11,717 were correctly identified and 8,472 were misclassified as short stays. The test accuracy of 57.8% and AUC score of 0.606 indicate marginal predictive performance, suggesting the model struggles to distinguish between short and long ICU stays effectively - we will be exploring other machine learning approaches shortly. The ROC curve further illustrates weak discrimination, with the model performing only slightly better than random guessing. We are able to deduce that logistic regression may not be the best machine learning approach because the linear assumption of logistic regression makes it less effective for capturing complex interactions and also due to its sensitivity to outliers. 
+
+```{r}
+set.seed(203)
+train_sampled <- train_data %>% sample_frac(1.0)
+
+train_x <- model.matrix(los_long ~ . - 1, data = train_sampled)
+train_y <- as.numeric(as.character(train_sampled$los_long))
+
+test_x <- model.matrix(los_long ~ . - 1, data = test_data)
+test_y <- as.numeric(as.character(test_data$los_long))
+
+registerDoParallel(cores = parallel::detectCores() - 1)
+set.seed(123)
+
+alpha_values <- seq(0, 1, length.out = 25)
+lambda_values <- 10^seq(-4, 1, length.out = 10)
+
+tuning_grid <- expand.grid(alpha = alpha_values, lambda = lambda_values)
+cv_results <- list()
+
+
+for (i in 1:nrow(tuning_grid)) {
+  alpha_i <- tuning_grid$alpha[i]
+  lambda_i <- tuning_grid$lambda[i]
+  
+  cv_fit <- cv.glmnet(
+    x = train_x, y = train_y, family = "binomial",
+    alpha = alpha_i, lambda = lambda_values,
+    nfolds = 5, parallel = TRUE
+  )
+  
+  cv_results[[i]] <- list(
+    alpha = alpha_i, lambda = cv_fit$lambda.min, 
+    error = min(cv_fit$cvm)
+  )
+}
+
+cv_results_df <- do.call(rbind, lapply(cv_results, as.data.frame))
+
+best_params <- cv_results_df[which.min(cv_results_df$error), ]
+best_alpha <- best_params$alpha
+best_lambda <- best_params$lambda
+
+best_params %>%
+  gt() %>%
+  tab_header(title = "Best Hyperparameters for Logistic Regression") %>%
+  fmt_number(columns = c(alpha, lambda, error), decimals = 4) %>%
+  cols_label(
+    alpha = "Best Alpha",
+    lambda = "Best Lambda",
+    error = "CV Error"
+  )
+
+final_model <- glmnet(
+  x = train_x, y = train_y, family = "binomial",
+  alpha = best_alpha, lambda = best_lambda
+)
+
+test_predictions <- predict(final_model, newx = test_x, type = "response")
+test_pred_labels <- ifelse(test_predictions > 0.5, 1, 0)
+
+conf_matrix <- table(Predicted = test_pred_labels, Actual = test_y)
+accuracy_logit <- sum(diag(conf_matrix)) / sum(conf_matrix)
+
+roc_curve <- roc(test_y, test_predictions)
+auc_score_logit <- auc(roc_curve)
+
+conf_matrix_df <- as.data.frame.matrix(conf_matrix)
+
+conf_matrix_long <- conf_matrix_df %>%
+  rownames_to_column(var = "Actual") %>%  
+  pivot_longer(cols = -Actual, names_to = "Predicted", values_to = "Freq")
+
+ggplot(conf_matrix_long, aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient(low = "white", high = "blue") +
+  geom_text(aes(label = Freq), color = "black", size = 6) +
+  labs(
+    title = "Confusion Matrix for Logistic Regression",
+    x = "Predicted",
+    y = "Actual"
+  ) +
+  theme_minimal()
+
+results_table <- data.frame(
+  Metric = c("Test Accuracy", "AUC Score"),
+  Value = c(round(accuracy_logit, 3), round(auc_score_logit, 3))
+)
+
+results_table %>%
+  gt() %>%
+  tab_header(title = "Model Performance Metrics") %>%
+  fmt_number(columns = Value, decimals = 3)
+
+plot(roc_curve, col = "blue", main = "ROC Curve for Logistic Regression")
+abline(a = 0, b = 1, lty = 2, col = "red")
+```
+
+# Machine Learning Approach 2: XG Boosting Classification Model 
+
+Analysis: Our second machine learning approach implements an XGBoost classification model to predict ICU length of stay, utilizing hyperparameter tuning and cross-validation for optimization. Again, we preprocess our mimiciv_icu_cohort dataset where categorical variables are converted into dummy variables, and the response variable (los_long) is formatted as a binary numeric variable (0 or 1). We then transform our data into XGBoost’s DMatrix format to enhance computational efficiency. We implement hyperparameter tuning is conducted through a grid search, testing key parameters such as learning rate (eta), tree depth, minimum child weight, subsampling, and column sampling across 21 randomly sampled combinations. Finally, each hyperparameter combination is evaluated with a 5-fold cross-validation strategy, which identifies the best model based on the highest AUC score and optimal iteration count, with early stopping is applied to prevent overfitting. 
+
+Results: The results from the XGBoost model showcase a moderate predictive performance in classifying ICU length of stay, showing improved performance in classification compared to logistic regression with elastic net (ENet) regularization. The optimal hyperparameters, selected through cross-validation, include a learning rate of 0.155, a maximum tree depth of 5, and full feature and instance sampling (subsample = 1, colsample_bytree = 1). The model achieved an AUC score of 0.641, demonstrating its ability to moderately differentiate between short and long ICU stays—an improvement over logistic regression, which had a lower AUC. However, the test accuracy of 60.1% suggests relatively low classification precision, which was likely influenced by class imbalances. We are able to see that there were also significant misclassifications done as seen in the confusion matrix, with 14,419 false positives and 13,974 false negatives. The ROC curve further supports these findings, indicating that while XGBoost outperforms random guessing and logistic regression, its discriminative power remains limited - we will use our last machine learning approach which is random forest to see if it will improve our model. 
+
+
+```{r}
+set.seed(203) 
+
+train_sampled <- train_data %>% sample_frac(1.0)  
+train_x <- model.matrix(los_long ~ . - 1, data = train_sampled)  
+test_x <- model.matrix(los_long ~ . - 1, data = test_data)
+
+train_y <- as.numeric(as.character(train_sampled$los_long))  
+test_y <- as.numeric(as.character(test_data$los_long))   
+
+dtrain <- xgb.DMatrix(data = train_x, label = train_y)
+dtest <- xgb.DMatrix(data = test_x, label = test_y)
+
+registerDoParallel(cores = parallel::detectCores() - 1) 
+
+set.seed(123)
+tuning_grid <- expand.grid(
+  eta = seq(0.01, 0.3, length.out = 3),  
+  max_depth = c(3, 5, 7),  
+  min_child_weight = c(1, 3, 5), 
+  subsample = c(0.6, 0.8, 1), 
+  colsample_bytree = c(0.6, 0.8, 1)  
+)
+
+tuning_grid <- tuning_grid[sample(1:nrow(tuning_grid), 21), ]
+
+cv_results <- list()
+
+for (i in 1:nrow(tuning_grid)) {
+  params <- list(
+    booster = "gbtree",
+    objective = "binary:logistic",
+    eval_metric = "auc",
+    eta = tuning_grid$eta[i],
+    max_depth = tuning_grid$max_depth[i],
+    min_child_weight = tuning_grid$min_child_weight[i],
+    subsample = tuning_grid$subsample[i],
+    colsample_bytree = tuning_grid$colsample_bytree[i]
+  )
+
+  cv_model <- xgb.cv(params = params, data = dtrain, nrounds = 100, 
+                      nfold = 5, early_stopping_rounds = 10, maximize = TRUE, 
+                      verbose = FALSE, parallel = TRUE)
+
+  best_iteration <- cv_model$best_iteration
+  best_auc <- max(cv_model$evaluation_log$test_auc_mean)
+  
+  cv_results[[i]] <- c(tuning_grid[i, ], best_iteration = best_iteration, 
+                       AUC = best_auc)
+}
+
+cv_results_df <- do.call(rbind, lapply(cv_results, as.data.frame))
+
+best_params <- cv_results_df[which.max(cv_results_df$AUC), ]
+
+best_params %>%
+  gt() %>%
+  tab_header(title = "Best Hyperparameters for XGBoost") %>%
+  fmt_number(columns = c(eta, max_depth, min_child_weight, subsample, 
+                         colsample_bytree, 
+                         best_iteration, AUC), decimals = 4) %>%
+  cols_label(
+    eta = "Learning Rate",
+    max_depth = "Max Depth",
+    min_child_weight = "Min Child Weight",
+    subsample = "Subsample Ratio",
+    colsample_bytree = "Column Sample by Tree",
+    best_iteration = "Best Iteration",
+    AUC = "Best CV AUC"
+  )
+
+final_params <- list(
+  booster = "gbtree",
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  eta = best_params$eta,
+  max_depth = best_params$max_depth,
+  min_child_weight = best_params$min_child_weight,
+  subsample = best_params$subsample,
+  colsample_bytree = best_params$colsample_bytree
+)
+
+final_model <- xgb.train(params = final_params, data = dtrain, 
+                         nrounds = best_params$best_iteration, 
+                         watchlist = list(train = dtrain, test = dtest), 
+                         early_stopping_rounds = 10, verbose = FALSE)
+
+
+test_predictions <- predict(final_model, newdata = dtest)
+
+roc_curve <- roc(test_y, test_predictions)
+best_threshold <- coords(roc_curve, "best", ret = "threshold")
+best_threshold <- as.numeric(best_threshold[1])
+
+test_pred_labels <- ifelse(test_predictions > best_threshold, 1, 0)
+
+conf_matrix <- table(Predicted = test_pred_labels, Actual = test_y)
+accuracy_xgb <- sum(diag(conf_matrix)) / sum(conf_matrix)
+auc_xbg <- auc(roc_curve)
+
+results_table <- data.frame(
+  Metric = c("Test Accuracy", "AUC Score"),
+  Value = c(round(accuracy_xgb, 3), round(auc_xbg, 3))
+)
+
+results_table %>%
+  gt() %>%
+  tab_header(title = "Model Performance Metrics") %>%
+  fmt_number(columns = Value, decimals = 3)
+
+conf_matrix_df <- as.data.frame.matrix(conf_matrix)
+
+conf_matrix_long <- conf_matrix_df %>%
+  rownames_to_column(var = "Actual") %>%  
+  pivot_longer(cols = -Actual, names_to = "Predicted", values_to = "Freq")
+
+ggplot(conf_matrix_long, aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient(low = "white", high = "blue") +
+  geom_text(aes(label = Freq), color = "black", size = 6) +
+  labs(
+    title = "Confusion Matrix",
+    x = "Predicted",
+    y = "Actual"
+  ) +
+  theme_minimal()
+
+plot(roc_curve, col = "blue", main = "ROC Curve for XGBoost Model")
+abline(a = 0, b = 1, lty = 2, col = "red")
+```
+
+# Machine Learning Approach 3: Random Forest 
+
+Analysis: Our third and last machine learning approach implements a Random Forest classification model using the Ranger package to predict ICU length of stay (LOS) based on patient data. First, we preprocessed the dataset by converting categorical variables into factors and ensuring that the target variable (los_long) was encoded as a binary factor with two levels: "Class0" (short stay) and "Class1" (long stay). To optimize model performance, we conducted hyperparameter tuning using a grid search approach. The hyperparameters tuned included: mtry (number of variables randomly sampled at each split), splitrule (gini or extratrees for decision tree splitting), and min.node.size (minimum node size for splits). A 3-fold cross-validation strategy was used, with AUC (Area Under the Curve) as the evaluation metric. The best combination of hyperparameters was then selected to train the final Random Forest model, consisting of 200 trees, using all available CPU cores for parallel computation. After training, the model was evaluated on the test set, generating probability predictions for each sample. The optimal classification threshold was determined using Youden’s Index from the ROC curve to maximize sensitivity and specificity. 
+
+Results: We are able to see from the results that the Random Forest model achieved a test accuracy of 59.4%, indicating moderate predictive performance. The AUC score of 0.631 suggests that the model has a reasonable ability to differentiate between short and long ICU stays, though it is not able to distinguish the 2 classes of los_long very well.The confusion matrix highlights significant misclassification issues, with 14,280 false negatives (actual short stays misclassified as long) and 13,769 false positives (actual long stays misclassified as short). This suggests that the model struggles with correctly classifying both classes, potentially due to imbalanced data or overlapping feature distributions. The ROC curve further supports this observation, demonstrating a moderate trade-off between sensitivity and specificity. Overall, while the Random Forest model shows some predictive power, further improvements are necessary and we are able to deduce that the XG Boosting model is the best approach to classify los_long. 
+
+```{r}
+set.seed(203)
+train_sampled <- train_data %>% sample_frac(1.0) 
+train_sampled <- train_sampled %>%
+  mutate(across(where(is.character), as.factor))
+test_data <- test_data %>%
+  mutate(across(where(is.character), as.factor))
+
+train_sampled$los_long <- factor(
+  train_sampled$los_long, levels = c(0, 1), labels = c("Class0", "Class1")
+)
+
+test_data$los_long <- factor(
+  test_data$los_long, levels = c(0, 1), labels = c("Class0", "Class1")
+)
+
+set.seed(123)
+
+tuning_grid <- expand.grid(
+  mtry = seq(2, floor(log2(ncol(train_sampled) - 1)), by = 2), 
+  splitrule = c("gini", "extratrees"), 
+  min.node.size = c(1, 5, 10)  
+)
+
+registerDoParallel(cores = parallel::detectCores() - 1)
+
+cv_control <- trainControl(
+  method = "cv", number = 3,  
+  summaryFunction = twoClassSummary, 
+  classProbs = TRUE, 
+  allowParallel = TRUE
+)
+
+rf_model <- train(
+  los_long ~ ., data = train_sampled,
+  method = "ranger",
+  trControl = cv_control,
+  tuneGrid = tuning_grid,
+  metric = "ROC"
+)
+
+final_rf <- ranger(
+  los_long ~ ., data = train_sampled, 
+  mtry = rf_model$bestTune$mtry, 
+  splitrule = rf_model$bestTune$splitrule,
+  min.node.size = rf_model$bestTune$min.node.size,
+  num.trees = 200,  
+  importance = "impurity", 
+  probability = TRUE, 
+  num.threads = parallel::detectCores() - 1
+)
+
+rf_pred <- predict(final_rf, test_data, type = "response")
+
+if ("predictions" %in% names(rf_pred)) {
+  test_predictions <- rf_pred$predictions
+  if (is.matrix(test_predictions)) {
+    test_predictions <- test_predictions[, "Class1", drop = TRUE]  
+  }
+}
+
+roc_curve <- roc(test_data$los_long, test_predictions)
+
+best_threshold <- coords(roc_curve, "best", ret = "threshold")
+best_threshold <- as.numeric(best_threshold[1])
+
+test_pred_labels <- ifelse(
+  test_predictions > best_threshold, "Class1", "Class0"
+)
+
+test_pred_labels <- factor(test_pred_labels, levels = c("Class0", "Class1"))
+test_data$los_long <- factor(test_data$los_long, levels = c("Class0", "Class1"))
+
+conf_matrix <- table(
+  Predicted = test_pred_labels, Actual = test_data$los_long
+)
+
+accuracy_rf <- sum(diag(conf_matrix)) / sum(conf_matrix)
+auc_rf <- auc(roc_curve)
+
+results_table <- data.frame(
+  Metric = c("Test Accuracy", "AUC Score"),
+  Value = c(round(accuracy_rf, 3), round(auc_rf, 3))
+)
+
+results_table %>%
+  gt() %>%
+  tab_header(title = "Model Performance Metrics") %>%
+  fmt_number(columns = Value, decimals = 3)
+
+conf_matrix_df <- as.data.frame.matrix(conf_matrix)
+
+colnames(conf_matrix_df) <- c("Predicted 0", "Predicted 1")
+rownames(conf_matrix_df) <- c("Actual 0", "Actual 1")
+
+conf_matrix_long <- conf_matrix_df %>%
+  rownames_to_column(var = "Actual") %>%  
+  pivot_longer(cols = -Actual, names_to = "Predicted", values_to = "Freq")
+
+ggplot(conf_matrix_long, aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "black") +
+  scale_fill_gradient(low = "white", high = "blue") +
+  geom_text(aes(label = Freq), color = "black", size = 6) +
+  labs(
+    title = "Confusion Matrix",
+    x = "Predicted",
+    y = "Actual"
+  ) +
+  theme_minimal()
+
+plot(roc_curve, col = "blue", main = "ROC Curve for Random Forest Model")
+abline(a = 0, b = 1, lty = 2, col = "red")
+```
+
+4. Compare model classification performance on the test set. Report both the area under ROC curve and accuracy for each machine learning algorithm and the model stacking. Interpret the results. What are the most important features in predicting long ICU stays? How do the models compare in terms of performance and interpretability?
+
+**Results** 
+
+The results indicate that XGBoost outperforms both Logistic Regression with Elastic Net regularization and Random Forest in predicting ICU length of stay, achieving the highest test accuracy (60.1%) and AUC score (0.641). Logistic Regression, while interpretable and efficient, performed the worst (57.8% accuracy, 0.606 AUC), likely due to its linear nature, which struggles to capture complex relationships among features. However, its simplicity allows for clear interpretation of feature importance. We are able to see that the Random Forest machine learning approach improved upon logistic regression (59.4% accuracy, 0.631 AUC), but its reliance on averaging multiple decision trees can make individual predictions less interpretable. XGBoost was the most suitable approach because it efficiently captures non-linear interactions, handles missing data well (which is prevalent in real data sets such as the MIMIC data), and optimizes performance using boosting techniques. Unlike Random Forest, which builds trees independently, XGBoost sequentially corrects errors, leading to a potentially better model. However, it is more computationally intensive and requires careful hyperparameter tuning. Overall, XGBoost provides the best trade-off between predictive power and model complexity, making it the most effective approach for this task.
+
+```{r}
+model_results <- list(
+  "Logistic Regression (ENet)" = list(
+    accuracy = accuracy_logit, 
+    auc = auc_score_logit
+  ),
+  "XGBoost" = list(
+    accuracy = accuracy_xgb, 
+    auc = auc_xbg
+  ),
+  "Random Forest" = list(
+    accuracy = accuracy_rf, 
+    auc = auc_rf
+  )
+)
+
+model_comparison <- do.call(
+  rbind, 
+  lapply(names(model_results), function(model) {
+    data.frame(
+      Model = model,
+      Test_Accuracy = model_results[[model]]$accuracy,
+      AUC_Score = model_results[[model]]$auc
+    )
+  })
+)
+
+model_comparison %>%
+  gt() %>%
+  tab_header(title = "Model Performance Comparison") %>%
+  fmt_number(columns = c(Test_Accuracy, AUC_Score), decimals = 3) %>%
+  cols_label(
+    Model = "Machine Learning Model",
+    Test_Accuracy = "Test Accuracy",
+    AUC_Score = "AUC Score"
+  )
+```
+
+**10 Most Important Features ** 
+
+The table presents the top 10 most important features influencing the Random Forest model's predictions for ICU length of stay. The most significant feature is systolic non-invasive blood pressure (importance score: 2,346.97), indicating its strong predictive value. Other important features include heart rate (2,264.77), hematocrit levels (2,228.56), and white blood cell (WBC) count (2,192.23), all of which play essential roles in patient stability and health status. Additionally, age at ICU admission (2,132.81) and temperature (2,070.43) contribute significantly to predictions, suggesting that both physiological and demographic factors influence ICU stay duration. Other important features include respiratory rate (1,966.11), creatinine (1,633.25), chloride (1,599.86), and sodium (1,571.78)
+
+```{r}
+feature_importance <- as.data.frame(importance(final_rf))
+feature_importance$Feature <- rownames(feature_importance)
+
+colnames(feature_importance)[1] <- "Importance_Score"
+
+feature_importance <- feature_importance %>%
+  arrange(desc(Importance_Score)) %>%
+  head(10)  
+
+feature_importance %>%
+  gt() %>%
+  tab_header(title = "Top 10 Most Important Features") %>%
+  fmt_number(columns = Importance_Score, decimals = 4) %>%
+  cols_label(
+    Feature = "Feature Name",
+    Importance_Score = "Feature Importance Score"
+  )
+```

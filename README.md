@@ -1,2 +1,2 @@
 # biostat-203b-2025-winter
-homework repo for 203b
+Homework Repo for Biostat-203b: Introduction to Data Science
